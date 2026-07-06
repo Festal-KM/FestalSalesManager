@@ -1,0 +1,138 @@
+// 社内成績管理アプリ Phase1 — Prisma schema
+// docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===== Enums (要件 7章) =====
+
+enum Role {
+  Admin
+  User
+}
+
+enum EmploymentType {
+  Proper
+  Outsource
+}
+
+enum Gender {
+  Male
+  Female
+  Other
+  Unknown
+}
+
+enum SalesStatus {
+  Actual
+  Forecast
+}
+
+// ===== User (要件 6-1) =====
+model User {
+  id         String   @id @default(cuid())
+  role       Role     @default(User)
+  login_id   String   @unique
+  login_pw   String // bcrypt ハッシュを保存（平文保存しない）
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Member との 1:1（FK は Member 側が保持）
+  linked_member Member? @relation("UserMember")
+
+  // SalesEntry の登録者 / 更新者
+  created_sales SalesEntry[] @relation("SalesCreatedBy")
+  updated_sales SalesEntry[] @relation("SalesUpdatedBy")
+
+  @@index([is_active])
+}
+
+// ===== Member (要件 6-2) =====
+model Member {
+  id              String         @id @default(cuid())
+  member_code     String         @unique // M-000001 形式（自動採番）
+  name            String
+  age             Int?
+  gender          Gender?
+  employment_type EmploymentType
+  is_active       Boolean        @default(true)
+  created_at      DateTime       @default(now())
+  updated_at      DateTime       @updatedAt
+
+  // ログインユーザーとの紐づけ（1ユーザー1メンバー: @unique で担保）
+  linked_user_id String? @unique
+  linked_user    User?   @relation("UserMember", fields: [linked_user_id], references: [id])
+
+  sales SalesEntry[]
+
+  @@index([is_active])
+  @@index([employment_type])
+}
+
+// ===== Client (要件 6-3) =====
+model Client {
+  id                    String   @id @default(cuid())
+  client_code           String   @unique // C-000001 形式（自動採番）
+  company_name          String
+  address               String?
+  billing_contact_name  String?
+  billing_contact_email String?
+  is_active             Boolean  @default(true)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  sales SalesEntry[]
+
+  @@index([is_active])
+}
+
+// ===== SalesEntry (要件 6-4) =====
+model SalesEntry {
+  id           String      @id @default(cuid())
+  sales_key    String      @unique // ${member_code}_${client_code}_${YYYYMM}_${status}
+  period_month DateTime    @db.Date // 月初1日で保存（時刻なし）
+  amount       Decimal     @db.Decimal(14, 2)
+  status       SalesStatus
+  memo         String?
+  year         Int
+  half         Int // 1 or 2
+  month        Int // 1..12
+  is_deleted   Boolean     @default(false) // 論理削除
+  created_at   DateTime    @default(now())
+  updated_at   DateTime    @updatedAt
+
+  member_id String
+  member    Member @relation(fields: [member_id], references: [id])
+
+  client_id String
+  client    Client @relation(fields: [client_id], references: [id])
+
+  created_by_id String
+  created_by    User   @relation("SalesCreatedBy", fields: [created_by_id], references: [id])
+
+  updated_by_id String?
+  updated_by    User?   @relation("SalesUpdatedBy", fields: [updated_by_id], references: [id])
+
+  @@index([member_id])
+  @@index([client_id])
+  @@index([period_month])
+  @@index([year, half])
+  @@index([is_deleted])
+}
+
+// ===== NumberSequence (要件 6-5) 採番管理 =====
+model NumberSequence {
+  id         String  @id @default(cuid())
+  seq_key    String  @unique // MEMBER / CLIENT / LABEL
+  current_no Int     @default(0)
+  prefix     String // M- / C- / L-
+  pad_digits Int // ゼロ埋め桁数
+  is_active  Boolean @default(true)
+}
