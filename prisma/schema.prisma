@@ -34,6 +34,13 @@ enum SalesStatus {
   Forecast
 }
 
+// 計上経費の区分（売上には計上しない支出。将来の利益計算=売上−経費 用に記録）
+enum ExpenseType {
+  Transportation // 交通費
+  Reimbursement // 立替経費
+  Other // その他
+}
+
 // ===== User (要件 6-1) =====
 model User {
   id         String   @id @default(cuid())
@@ -57,11 +64,16 @@ model User {
 // ===== Member (要件 6-2) =====
 model Member {
   id              String         @id @default(cuid())
-  member_code     String         @unique // M-000001 形式（自動採番）
+  member_code     String         @unique // 4桁の数字（例: 0001）。自動採番＋手動変更可
   name            String
   age             Int?
   gender          Gender?
   employment_type EmploymentType
+  position        String? // 役職
+  department      String? // 部署
+  // 外注の場合のみ使用
+  affiliation         String? // 所属
+  purchase_unit_price Decimal? @db.Decimal(14, 2) // 仕入単価
   is_active       Boolean        @default(true)
   created_at      DateTime       @default(now())
   updated_at      DateTime       @updatedAt
@@ -105,6 +117,9 @@ model SalesEntry {
   half         Int // 1 or 2
   month        Int // 1..12
   is_deleted   Boolean     @default(false) // 論理削除
+
+  // 計上経費（任意・複数可）。売上(amount)には含めず、別枠で記録する。
+  expenses     Expense[]
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt
 
@@ -125,6 +140,23 @@ model SalesEntry {
   @@index([period_month])
   @@index([year, half])
   @@index([is_deleted])
+}
+
+// ===== Expense 計上経費（SalesEntry 1件に複数紐づく） =====
+// 交通費・立替経費・その他が同月に同時発生しうるため 1:N で保持する。
+// 売上(amount)には計上せず、将来の利益計算(売上−経費)用に記録する。
+model Expense {
+  id             String      @id @default(cuid())
+  type           ExpenseType
+  amount         Decimal     @db.Decimal(14, 2)
+  note           String? // その他の内容など
+  created_at     DateTime    @default(now())
+  updated_at     DateTime    @updatedAt
+
+  sales_entry_id String
+  sales_entry    SalesEntry @relation(fields: [sales_entry_id], references: [id], onDelete: Cascade)
+
+  @@index([sales_entry_id])
 }
 
 // ===== NumberSequence (要件 6-5) 採番管理 =====

@@ -41,6 +41,12 @@ export default async function EditMemberPage({
           age: m.age,
           gender: m.gender,
           employment_type: m.employment_type,
+          position: m.position,
+          department: m.department,
+          affiliation: m.affiliation,
+          purchase_unit_price: m.purchase_unit_price
+            ? m.purchase_unit_price.toString()
+            : null,
           linked_user_id: m.linked_user_id,
           is_active: m.is_active,
         }}

@@ -22,6 +22,12 @@ export const SALES_STATUS_LABELS = {
   Forecast: "見込み",
 } as const;
 
+export const EXPENSE_TYPE_LABELS = {
+  Transportation: "交通費",
+  Reimbursement: "立替経費",
+  Other: "その他",
+} as const;
+
 export const EMPLOYMENT_OPTIONS = [
   { value: "Proper", label: EMPLOYMENT_LABELS.Proper },
   { value: "Outsource", label: EMPLOYMENT_LABELS.Outsource },
@@ -37,4 +43,10 @@ export const GENDER_OPTIONS = [
 export const SALES_STATUS_OPTIONS = [
   { value: "Actual", label: SALES_STATUS_LABELS.Actual },
   { value: "Forecast", label: SALES_STATUS_LABELS.Forecast },
+];
+
+export const EXPENSE_TYPE_OPTIONS = [
+  { value: "Transportation", label: EXPENSE_TYPE_LABELS.Transportation },
+  { value: "Reimbursement", label: EXPENSE_TYPE_LABELS.Reimbursement },
+  { value: "Other", label: EXPENSE_TYPE_LABELS.Other },
 ];

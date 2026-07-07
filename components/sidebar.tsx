@@ -44,12 +44,15 @@ export function Sidebar({
         collapsed ? "w-16" : "w-60",
       )}
     >
-      {/* ヘッダー */}
-      <div className="flex h-14 items-center justify-between px-3">
+      {/* ヘッダー: ロゴ枠（ロゴ実装前のプレースホルダー） */}
+      <div className="flex h-16 items-center gap-2 border-b border-white/10 px-3">
         {!collapsed && (
-          <span className="truncate text-sm font-bold text-white">
-            成績管理ツール
-          </span>
+          <div
+            className="flex h-10 flex-1 items-center justify-center rounded-md border border-dashed border-white/25 text-[11px] font-semibold tracking-widest text-white/40"
+            aria-label="ロゴ"
+          >
+            LOGO
+          </div>
         )}
         <button
           type="button"

@@ -15,7 +15,10 @@ export default async function EditSalesPage({
   const user = await requireUser();
   const { id } = await params;
 
-  const entry = await prisma.salesEntry.findUnique({ where: { id } });
+  const entry = await prisma.salesEntry.findUnique({
+    where: { id },
+    include: { expenses: { orderBy: { created_at: "asc" } } },
+  });
   // 要件18-5 削除済み/存在しない場合は一覧へ
   if (!entry || entry.is_deleted) redirect("/sales");
 
@@ -55,6 +58,11 @@ export default async function EditSalesPage({
           amount: entry.amount.toString(),
           status: entry.status,
           memo: entry.memo,
+          expenses: entry.expenses.map((e) => ({
+            type: e.type,
+            amount: e.amount.toString(),
+            note: e.note ?? "",
+          })),
         }}
       />
     </div>

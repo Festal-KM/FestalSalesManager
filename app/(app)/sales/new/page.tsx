@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
-import { SalesForm } from "../sales-form";
+import { SalesBulkForm } from "../sales-bulk-form";
 
 export const metadata = { title: "売上登録 | 成績管理ツール" };
 
@@ -23,7 +23,7 @@ export default async function NewSalesPage() {
   return (
     <div>
       <PageHeader title="売上登録" backHref="/sales" />
-      <SalesForm mode="new" members={members} clients={clients} />
+      <SalesBulkForm members={members} clients={clients} />
     </div>
   );
 }

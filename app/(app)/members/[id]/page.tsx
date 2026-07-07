@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EMPLOYMENT_LABELS, GENDER_LABELS } from "@/lib/enums";
+import { formatYen } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "メンバー詳細 | 成績管理ツール" };
@@ -58,17 +59,29 @@ export default async function MemberDetailPage({
 
       <Card className="max-w-2xl">
         <CardContent>
-          <Row label="メンバーID">
+          <Row label="メンバーコード">
             <span className="font-mono">{m.member_code}</span>
           </Row>
           <Row label="氏名">{m.name}</Row>
           <Row label="年齢">{m.age ?? "-"}</Row>
           <Row label="性別">{m.gender ? GENDER_LABELS[m.gender] : "-"}</Row>
+          <Row label="役職">{m.position ?? "-"}</Row>
+          <Row label="部署">{m.department ?? "-"}</Row>
           <Row label="雇用区分">
             <Badge variant={m.employment_type === "Proper" ? "brand" : "light"}>
               {EMPLOYMENT_LABELS[m.employment_type]}
             </Badge>
           </Row>
+          {m.employment_type === "Outsource" && (
+            <>
+              <Row label="所属">{m.affiliation ?? "-"}</Row>
+              <Row label="仕入単価">
+                {m.purchase_unit_price
+                  ? formatYen(m.purchase_unit_price.toString())
+                  : "-"}
+              </Row>
+            </>
+          )}
           <Row label="ログインユーザー">{m.linked_user?.login_id ?? "-"}</Row>
           <Row label="状態">
             {m.is_active ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { saveMember, deactivateMember, type MemberFormState } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,10 @@ export type MemberFormData = {
   age: number | null;
   gender: string | null;
   employment_type: string;
+  position: string | null;
+  department: string | null;
+  affiliation: string | null;
+  purchase_unit_price: string | null;
   linked_user_id: string | null;
   is_active: boolean;
 };
@@ -29,12 +33,31 @@ export function MemberForm({
   mode,
   member,
   users,
+  suggestedCode,
 }: {
   mode: "new" | "edit";
   member?: MemberFormData;
   users: UserOption[];
+  suggestedCode?: string;
 }) {
   const [state, formAction, isPending] = useActionState(saveMember, initial);
+
+  // 入力は制御コンポーネントで保持（送信後の自動リセット・エラー時の消失を防ぐ）
+  const [memberCode, setMemberCode] = useState(
+    member?.member_code ?? suggestedCode ?? "",
+  );
+  const [name, setName] = useState(member?.name ?? "");
+  const [age, setAge] = useState(member?.age != null ? String(member.age) : "");
+  const [gender, setGender] = useState(member?.gender ?? "");
+  const [employment, setEmployment] = useState(member?.employment_type ?? "");
+  const [position, setPosition] = useState(member?.position ?? "");
+  const [department, setDepartment] = useState(member?.department ?? "");
+  const [affiliation, setAffiliation] = useState(member?.affiliation ?? "");
+  const [price, setPrice] = useState(member?.purchase_unit_price ?? "");
+  const [linkedUserId, setLinkedUserId] = useState(member?.linked_user_id ?? "");
+  const [isActive, setIsActive] = useState(member?.is_active ?? true);
+
+  const isOutsource = employment === "Outsource";
 
   return (
     <div className="max-w-xl space-y-4">
@@ -42,19 +65,33 @@ export function MemberForm({
         {mode === "edit" && <input type="hidden" name="id" value={member!.id} />}
 
         <div>
-          <Label>メンバーID</Label>
+          <Label htmlFor="member_code" required>
+            メンバーコード
+          </Label>
           <Input
-            value={mode === "edit" ? member!.member_code : "（保存時に自動採番されます）"}
-            readOnly
-            disabled
+            id="member_code"
+            name="member_code"
+            value={memberCode}
+            onChange={(e) => setMemberCode(e.target.value)}
+            placeholder="0001"
+            className="w-40"
           />
+          <p className="mt-1 text-xs text-muted-fg">
+            4桁の数字（自動採番されますが変更できます）。
+          </p>
         </div>
 
         <div>
           <Label htmlFor="name" required>
             氏名
           </Label>
-          <Input id="name" name="name" defaultValue={member?.name ?? ""} autoFocus />
+          <Input
+            id="name"
+            name="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -63,14 +100,19 @@ export function MemberForm({
             <Input
               id="age"
               name="age"
-              type="number"
-              min={0}
-              defaultValue={member?.age ?? ""}
+              inputMode="numeric"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
             />
           </div>
           <div>
             <Label htmlFor="gender">性別</Label>
-            <Select id="gender" name="gender" defaultValue={member?.gender ?? ""}>
+            <Select
+              id="gender"
+              name="gender"
+              value={gender}
+              onChange={(e) => setGender(e.target.value)}
+            >
               <option value="">（未選択）</option>
               {GENDER_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -81,6 +123,27 @@ export function MemberForm({
           </div>
         </div>
 
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="position">役職</Label>
+            <Input
+              id="position"
+              name="position"
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="department">部署</Label>
+            <Input
+              id="department"
+              name="department"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+            />
+          </div>
+        </div>
+
         <div>
           <Label htmlFor="employment_type" required>
             雇用区分
@@ -88,7 +151,8 @@ export function MemberForm({
           <Select
             id="employment_type"
             name="employment_type"
-            defaultValue={member?.employment_type ?? ""}
+            value={employment}
+            onChange={(e) => setEmployment(e.target.value)}
           >
             <option value="">（選択してください）</option>
             {EMPLOYMENT_OPTIONS.map((o) => (
@@ -99,12 +163,39 @@ export function MemberForm({
           </Select>
         </div>
 
+        {/* 外注のみ 所属・仕入単価 */}
+        {isOutsource && (
+          <div className="grid grid-cols-2 gap-3 rounded-md border border-gray-200 p-3">
+            <div>
+              <Label htmlFor="affiliation">所属</Label>
+              <Input
+                id="affiliation"
+                name="affiliation"
+                value={affiliation}
+                onChange={(e) => setAffiliation(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="purchase_unit_price">仕入単価（円）</Label>
+              <Input
+                id="purchase_unit_price"
+                name="purchase_unit_price"
+                inputMode="numeric"
+                placeholder="0"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
         <div>
           <Label htmlFor="linked_user_id">ログインユーザー紐づけ</Label>
           <Select
             id="linked_user_id"
             name="linked_user_id"
-            defaultValue={member?.linked_user_id ?? ""}
+            value={linkedUserId}
+            onChange={(e) => setLinkedUserId(e.target.value)}
           >
             <option value="">（紐づけなし）</option>
             {users.map((u) => (
@@ -123,7 +214,8 @@ export function MemberForm({
             <input
               type="checkbox"
               name="is_active"
-              defaultChecked={member!.is_active}
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
             有効

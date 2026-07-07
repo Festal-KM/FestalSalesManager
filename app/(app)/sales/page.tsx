@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { Plus, Pencil } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentDbUser, getCurrentUser } from "@/lib/auth-helpers";
+import { applySalesFilter, clearSalesFilter } from "./actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
@@ -10,23 +12,21 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import {
-  normalizeToMonthStart,
-  deriveYearHalfMonth,
-  toMonthInputValue,
-  currentMonthStart,
-} from "@/lib/date";
+import { normalizeToMonthStart } from "@/lib/date";
 import { formatYen, formatYearMonth } from "@/lib/format";
-import { EMPLOYMENT_LABELS, SALES_STATUS_LABELS } from "@/lib/enums";
+import {
+  EMPLOYMENT_LABELS,
+  SALES_STATUS_LABELS,
+  EXPENSE_TYPE_LABELS,
+} from "@/lib/enums";
+import { syncDueSalesStatuses } from "@/lib/sales-sync";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "売上一覧 | 成績管理ツール" };
 
 type SP = Promise<{
-  period_type?: string;
-  month?: string;
-  year?: string;
-  half?: string;
+  start_month?: string;
+  end_month?: string;
   status?: string;
   employment?: string;
   member_id?: string;
@@ -35,6 +35,13 @@ type SP = Promise<{
 }>;
 
 export default async function SalesPage({ searchParams }: { searchParams: SP }) {
+  // 到来済み（前月以前）の見込みを実績へ自動反映（冪等）
+  try {
+    await syncDueSalesStatuses();
+  } catch {
+    // 反映に失敗しても画面表示は継続する
+  }
+
   const [user, dbUser, sp] = await Promise.all([
     getCurrentUser(),
     getCurrentDbUser(),
@@ -43,28 +50,23 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
   const isAdmin = user?.role === "Admin";
   const myMemberId = dbUser?.linked_member?.id ?? null;
 
-  const cur = currentMonthStart();
-  const curDerived = deriveYearHalfMonth(cur);
-
-  const period_type = sp.period_type ?? "month";
-  const month = sp.month || toMonthInputValue(cur);
-  const year = Number(sp.year || curDerived.year);
-  const half = Number(sp.half || curDerived.half);
+  // 開始月・終了月は URL 未指定なら Cookie の記憶値を初期表示に使う（要望）
+  const jar = await cookies();
+  const startMonth = (sp.start_month ?? jar.get("sales_start_month")?.value ?? "").trim();
+  const endMonth = (sp.end_month ?? jar.get("sales_end_month")?.value ?? "").trim();
   const status = sp.status ?? "all";
   const employment = sp.employment ?? "all";
   const memberId = sp.member_id ?? "";
   const clientId = sp.client_id ?? "";
   const keyword = (sp.keyword ?? "").trim();
 
-  // 期間条件（要件16-5）
-  let periodWhere: Record<string, unknown> = {};
-  if (period_type === "month") {
-    periodWhere = { period_month: normalizeToMonthStart(month) };
-  } else if (period_type === "half") {
-    periodWhere = { year, half };
-  } else if (period_type === "year") {
-    periodWhere = { year };
-  }
+  // 期間条件: 開始月〜終了月（両端含む）。未指定の端は制限なし。
+  const isYm = (v: string) => /^\d{4}-\d{2}$/.test(v);
+  const periodRange: { gte?: Date; lte?: Date } = {};
+  if (isYm(startMonth)) periodRange.gte = normalizeToMonthStart(startMonth);
+  if (isYm(endMonth)) periodRange.lte = normalizeToMonthStart(endMonth);
+  const periodWhere =
+    periodRange.gte || periodRange.lte ? { period_month: periodRange } : {};
 
   const sales = await prisma.salesEntry.findMany({
     where: {
@@ -87,7 +89,11 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
           }
         : {}),
     },
-    include: { member: true, client: true },
+    include: {
+      member: true,
+      client: true,
+      expenses: { orderBy: { created_at: "asc" } },
+    },
     orderBy: [{ period_month: "desc" }, { member: { member_code: "asc" } }],
   });
 
@@ -119,29 +125,14 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
 
       {/* 検索条件（要件16-2） */}
       <Card className="mb-4 p-4">
-        <form method="get" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <form action={applySalesFilter} className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">期間タイプ</label>
-            <Select name="period_type" defaultValue={period_type}>
-              <option value="month">月</option>
-              <option value="half">半期</option>
-              <option value="year">年</option>
-            </Select>
+            <label className="mb-1 block text-xs font-medium text-gray-600">開始月</label>
+            <Input type="month" name="start_month" defaultValue={startMonth} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">対象月</label>
-            <Input type="month" name="month" defaultValue={month} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">対象年</label>
-            <Input type="number" name="year" defaultValue={year} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">半期</label>
-            <Select name="half" defaultValue={String(half)}>
-              <option value="1">上期(1〜6月)</option>
-              <option value="2">下期(7〜12月)</option>
-            </Select>
+            <label className="mb-1 block text-xs font-medium text-gray-600">終了月</label>
+            <Input type="month" name="end_month" defaultValue={endMonth} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">予実</label>
@@ -165,7 +156,7 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
               <option value="">すべて</option>
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.member_code} / {m.name}
+                  {m.name}
                 </option>
               ))}
             </Select>
@@ -176,7 +167,7 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
               <option value="">すべて</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.client_code} / {c.company_name}
+                  {c.company_name}
                 </option>
               ))}
             </Select>
@@ -189,9 +180,9 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
             <Button type="submit" variant="light">
               検索
             </Button>
-            <Link href="/sales" className={cn(buttonVariants({ variant: "back" }))}>
+            <Button type="submit" formAction={clearSalesFilter} variant="back">
               条件クリア
-            </Link>
+            </Button>
           </div>
         </form>
       </Card>
@@ -209,6 +200,7 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
                 <TH>取引先</TH>
                 <TH className="text-right">売上金額</TH>
                 <TH>予実</TH>
+                <TH>経費</TH>
                 <TH>メモ</TH>
                 <TH>操作</TH>
               </TR>
@@ -219,9 +211,6 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
                   <TD>{formatYearMonth(s.period_month)}</TD>
                   <TD>
                     <div className="font-medium">{s.member.name}</div>
-                    <div className="font-mono text-xs text-muted-fg">
-                      {s.member.member_code}
-                    </div>
                   </TD>
                   <TD>
                     <Badge variant={s.member.employment_type === "Proper" ? "brand" : "light"}>
@@ -230,15 +219,33 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
                   </TD>
                   <TD>
                     <div className="font-medium">{s.client.company_name}</div>
-                    <div className="font-mono text-xs text-muted-fg">
-                      {s.client.client_code}
-                    </div>
                   </TD>
                   <TD className="text-right font-medium">{formatYen(s.amount.toString())}</TD>
                   <TD>
                     <Badge variant={s.status === "Actual" ? "success" : "warning"}>
                       {SALES_STATUS_LABELS[s.status]}
                     </Badge>
+                  </TD>
+                  <TD>
+                    {s.expenses.length === 0 ? (
+                      <span className="text-muted-fg">-</span>
+                    ) : (
+                      <div className="space-y-1">
+                        {s.expenses.map((ex) => (
+                          <div key={ex.id} className="whitespace-nowrap text-xs">
+                            <span className="text-muted-fg">
+                              {EXPENSE_TYPE_LABELS[ex.type]}
+                            </span>{" "}
+                            <span className="font-medium">
+                              {formatYen(ex.amount.toString())}
+                            </span>
+                            {ex.type === "Other" && ex.note && (
+                              <span className="ml-1 text-muted-fg">（{ex.note}）</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </TD>
                   <TD className="max-w-40 truncate text-muted-fg">{s.memo ?? "-"}</TD>
                   <TD>

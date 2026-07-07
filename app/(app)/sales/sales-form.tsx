@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SALES_STATUS_OPTIONS } from "@/lib/enums";
+import { ExpenseRows, type ExpenseRow } from "./expense-rows";
 
 export type MemberOption = { id: string; member_code: string; name: string };
 export type ClientOption = { id: string; client_code: string; company_name: string };
@@ -27,6 +28,7 @@ export type SalesEntryData = {
   amount: string;
   status: string;
   memo: string | null;
+  expenses: ExpenseRow[];
 };
 
 const initial: SalesFormState = {};
@@ -52,14 +54,6 @@ export function SalesForm({
   const [periodMonth, setPeriodMonth] = useState(entry?.period_month ?? "");
   const [status, setStatus] = useState(entry?.status ?? "");
 
-  const memberCode = members.find((m) => m.id === memberId)?.member_code ?? "";
-  const clientCode = clients.find((c) => c.id === clientId)?.client_code ?? "";
-  const yyyymm = periodMonth ? periodMonth.replace("-", "") : "";
-  const salesKey =
-    memberCode && clientCode && yyyymm && status
-      ? `${memberCode}_${clientCode}_${yyyymm}_${status}`
-      : "（メンバー・取引先・対象月・予実を選ぶと自動生成）";
-
   return (
     <div className="max-w-xl space-y-4">
       <form action={formAction} className="space-y-4">
@@ -78,7 +72,7 @@ export function SalesForm({
             <option value="">（選択してください）</option>
             {members.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.member_code} / {m.name}
+                {m.name}
               </option>
             ))}
           </Select>
@@ -97,7 +91,7 @@ export function SalesForm({
             <option value="">（選択してください）</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.client_code} / {c.company_name}
+                {c.company_name}
               </option>
             ))}
           </Select>
@@ -143,22 +137,18 @@ export function SalesForm({
           <Input
             id="amount"
             name="amount"
-            type="number"
-            min={0}
-            step={1}
+            inputMode="numeric"
             defaultValue={entry?.amount ?? ""}
             placeholder="0"
           />
         </div>
 
+        {/* 計上経費（任意・複数可）— 売上には含めず別枠で記録 */}
+        <ExpenseRows initial={entry?.expenses} />
+
         <div>
           <Label htmlFor="memo">メモ</Label>
           <Textarea id="memo" name="memo" defaultValue={entry?.memo ?? ""} />
-        </div>
-
-        <div>
-          <Label>sales_key（自動生成・編集不可）</Label>
-          <Input value={salesKey} readOnly disabled className="font-mono text-xs" />
         </div>
 
         {state.error && (

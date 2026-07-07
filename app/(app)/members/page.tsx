@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { EMPLOYMENT_LABELS, GENDER_LABELS } from "@/lib/enums";
+import { EMPLOYMENT_LABELS } from "@/lib/enums";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "メンバー一覧 | 成績管理ツール" };
@@ -36,9 +36,12 @@ export default async function MembersPage({ searchParams }: { searchParams: SP }
         ? { employment_type: employment }
         : {}),
       ...(keyword
-        ? keyword.startsWith("M-")
-          ? { member_code: { contains: keyword, mode: "insensitive" } }
-          : { name: { contains: keyword, mode: "insensitive" } }
+        ? {
+            OR: [
+              { name: { contains: keyword, mode: "insensitive" } },
+              { member_code: { contains: keyword, mode: "insensitive" } },
+            ],
+          }
         : {}),
     },
     include: { linked_user: { select: { login_id: true } } },
@@ -60,9 +63,9 @@ export default async function MembersPage({ searchParams }: { searchParams: SP }
         <form method="get" className="flex flex-wrap items-end gap-3">
           <div className="min-w-56 flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-600">
-              キーワード（氏名 / M-コード）
+              キーワード（氏名 / コード）
             </label>
-            <Input name="keyword" defaultValue={keyword} placeholder="氏名 または M-000001" />
+            <Input name="keyword" defaultValue={keyword} placeholder="氏名 または 0001" />
           </div>
           <div className="w-36">
             <label className="mb-1 block text-xs font-medium text-gray-600">雇用区分</label>
@@ -96,10 +99,10 @@ export default async function MembersPage({ searchParams }: { searchParams: SP }
           <Table>
             <THead>
               <TR>
-                <TH>メンバーID</TH>
+                <TH>メンバーコード</TH>
                 <TH>氏名</TH>
-                <TH>年齢</TH>
-                <TH>性別</TH>
+                <TH>役職</TH>
+                <TH>部署</TH>
                 <TH>雇用区分</TH>
                 <TH>ログインユーザー</TH>
                 <TH>状態</TH>
@@ -111,8 +114,8 @@ export default async function MembersPage({ searchParams }: { searchParams: SP }
                 <TR key={m.id}>
                   <TD className="font-mono text-xs">{m.member_code}</TD>
                   <TD className="font-medium">{m.name}</TD>
-                  <TD>{m.age ?? "-"}</TD>
-                  <TD>{m.gender ? GENDER_LABELS[m.gender] : "-"}</TD>
+                  <TD>{m.position ?? "-"}</TD>
+                  <TD>{m.department ?? "-"}</TD>
                   <TD>
                     <Badge variant={m.employment_type === "Proper" ? "brand" : "light"}>
                       {EMPLOYMENT_LABELS[m.employment_type]}

@@ -4,13 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
-import { nextCode } from "@/lib/numbering";
 
 type EmploymentLit = "Proper" | "Outsource";
 type GenderLit = "Male" | "Female" | "Other" | "Unknown";
 const GENDERS: GenderLit[] = ["Male", "Female", "Other", "Unknown"];
 
 export type MemberFormState = { error?: string };
+
+/** メンバーコードを正規化（数字のみなら4桁ゼロ埋め） */
+function normalizeMemberCode(raw: string): string {
+  const v = raw.trim();
+  return /^\d+$/.test(v) ? v.padStart(4, "0") : v;
+}
 
 /** S31 メンバー登録・編集（Admin専用）。id空=新規 / id有=編集 */
 export async function saveMember(
@@ -20,15 +25,20 @@ export async function saveMember(
   await requireAdmin();
 
   const id = String(formData.get("id") ?? "").trim();
+  const member_code = normalizeMemberCode(String(formData.get("member_code") ?? ""));
   const name = String(formData.get("name") ?? "").trim();
   const employment_type = String(formData.get("employment_type") ?? "");
   const genderRaw = String(formData.get("gender") ?? "");
   const ageRaw = String(formData.get("age") ?? "").trim();
+  const position = String(formData.get("position") ?? "").trim();
+  const department = String(formData.get("department") ?? "").trim();
+  const affiliation = String(formData.get("affiliation") ?? "").trim();
+  const priceRaw = String(formData.get("purchase_unit_price") ?? "").trim();
   const linked_user_id = String(formData.get("linked_user_id") ?? "").trim();
   const is_active = formData.get("is_active") === "on";
 
   // 要件20-8 バリデーション
-  if (!name) return { error: "必須項目を入力してください" };
+  if (!name || !member_code) return { error: "必須項目を入力してください" };
   if (employment_type !== "Proper" && employment_type !== "Outsource") {
     return { error: "必須項目を入力してください" };
   }
@@ -41,10 +51,27 @@ export async function saveMember(
     }
   }
 
+  const isOutsource = employment_type === "Outsource";
+  let purchase_unit_price: string | null = null;
+  if (isOutsource && priceRaw !== "") {
+    const p = Number(priceRaw);
+    if (!Number.isFinite(p) || p < 0) {
+      return { error: "仕入単価は0以上で入力してください" };
+    }
+    purchase_unit_price = priceRaw;
+  }
+
   const gender: GenderLit | null =
     genderRaw && GENDERS.includes(genderRaw as GenderLit)
       ? (genderRaw as GenderLit)
       : null;
+
+  // メンバーコード重複チェック（@unique でも担保）
+  const codeDup = await prisma.member.findFirst({
+    where: { member_code, ...(id ? { NOT: { id } } : {}) },
+    select: { id: true },
+  });
+  if (codeDup) return { error: "このメンバーコードは既に使われています" };
 
   // 要件20-9 linked_user 重複チェック（DBでも @unique で担保）
   if (linked_user_id) {
@@ -56,21 +83,38 @@ export async function saveMember(
   }
 
   const data = {
+    member_code,
     name,
     age,
     gender,
     employment_type: employment_type as EmploymentLit,
+    position: position || null,
+    department: department || null,
+    // 外注のみ 所属・仕入単価を保持（プロパーは空に）
+    affiliation: isOutsource ? affiliation || null : null,
+    purchase_unit_price: isOutsource ? purchase_unit_price : null,
     linked_user_id: linked_user_id || null,
   };
 
   if (!id) {
-    // 新規: member_code を採番（要件20-10）。is_active=true 固定。
     await prisma.$transaction(async (tx) => {
-      const member_code = await nextCode(tx, "MEMBER");
-      await tx.member.create({ data: { ...data, member_code, is_active: true } });
+      await tx.member.create({ data: { ...data, is_active: true } });
+      // 採番の現在値を、使ったコード以上に進める（次の候補が被らないように）
+      if (/^\d+$/.test(member_code)) {
+        const seq = await tx.numberSequence.findUnique({
+          where: { seq_key: "MEMBER" },
+          select: { current_no: true },
+        });
+        const used = parseInt(member_code, 10);
+        if (seq && used > seq.current_no) {
+          await tx.numberSequence.update({
+            where: { seq_key: "MEMBER" },
+            data: { current_no: used },
+          });
+        }
+      }
     });
   } else {
-    // 編集: member_code は更新しない（要件20-11）
     await prisma.member.update({ where: { id }, data: { ...data, is_active } });
   }
 
