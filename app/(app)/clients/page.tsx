@@ -31,11 +31,15 @@ export default async function ClientsPage({ searchParams }: { searchParams: SP }
           ? { is_active: false }
           : {}),
       ...(keyword
-        ? keyword.startsWith("C-")
-          ? { client_code: { contains: keyword, mode: "insensitive" } }
-          : { company_name: { contains: keyword, mode: "insensitive" } }
+        ? {
+            OR: [
+              { company_name: { contains: keyword, mode: "insensitive" } },
+              { client_code: { contains: keyword, mode: "insensitive" } },
+            ],
+          }
         : {}),
     },
+    include: { contacts: { orderBy: { created_at: "asc" } } },
     orderBy: { client_code: "asc" },
   });
 
@@ -55,9 +59,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: SP }
         <form method="get" className="flex flex-wrap items-end gap-3">
           <div className="min-w-56 flex-1">
             <label className="mb-1 block text-xs font-medium text-gray-600">
-              キーワード（会社名 / C-コード）
+              キーワード（会社名 / コード）
             </label>
-            <Input name="keyword" defaultValue={keyword} placeholder="会社名 または C-000001" />
+            <Input name="keyword" defaultValue={keyword} placeholder="会社名 または C001" />
           </div>
           <div className="w-40">
             <label className="mb-1 block text-xs font-medium text-gray-600">状態</label>
@@ -88,9 +92,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: SP }
               <TR>
                 <TH>取引先ID</TH>
                 <TH>会社名</TH>
-                <TH>所在地</TH>
-                <TH>請求担当者</TH>
-                <TH>請求担当者メール</TH>
+                <TH>担当者</TH>
+                <TH>連絡手段</TH>
                 <TH>状態</TH>
                 {isAdmin && <TH>操作</TH>}
               </TR>
@@ -100,9 +103,32 @@ export default async function ClientsPage({ searchParams }: { searchParams: SP }
                 <TR key={c.id}>
                   <TD className="font-mono text-xs">{c.client_code}</TD>
                   <TD className="font-medium">{c.company_name}</TD>
-                  <TD className="text-muted-fg">{c.address ?? "-"}</TD>
-                  <TD>{c.billing_contact_name ?? "-"}</TD>
-                  <TD className="text-muted-fg">{c.billing_contact_email ?? "-"}</TD>
+                  <TD>
+                    {c.contacts.length === 0 ? (
+                      <span className="text-muted-fg">-</span>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {c.contacts.map((ct) => (
+                          <div key={ct.id} className="text-xs font-medium">
+                            {ct.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </TD>
+                  <TD>
+                    {c.contacts.length === 0 ? (
+                      <span className="text-muted-fg">-</span>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {c.contacts.map((ct) => (
+                          <div key={ct.id} className="text-xs text-muted-fg">
+                            {ct.contact_method || "-"}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </TD>
                   <TD>
                     {c.is_active ? (
                       <Badge variant="success">有効</Badge>

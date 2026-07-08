@@ -82,27 +82,64 @@ model Member {
   linked_user_id String? @unique
   linked_user    User?   @relation("UserMember", fields: [linked_user_id], references: [id])
 
-  sales SalesEntry[]
+  sales    SalesEntry[]
+  missions Mission[]
 
   @@index([is_active])
   @@index([employment_type])
 }
 
+// ===== Mission 個人ミッション（マイページ） =====
+// メンバー × 会計年度 × 半期（1=上期 4〜9月 / 2=下期 10〜3月）で1件。
+// 管理者が課すミッションと本人が作るミッション、それぞれに本人の自己記入（振り返り/進捗）を持つ。
+model Mission {
+  id          String @id @default(cuid())
+  fiscal_year Int // 4月始まりの会計年度
+  half        Int // 1=上期 / 2=下期
+
+  admin_mission String? // 管理者が課すミッション（管理者が設定）
+  admin_review  String? // 上記への本人の振り返り/進捗（自己記入）
+  self_mission  String? // 本人が作成するミッション（本人が記入）
+  self_review   String? // 上記への本人の振り返り/進捗（自己記入）
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  member_id String
+  member    Member @relation(fields: [member_id], references: [id], onDelete: Cascade)
+
+  @@unique([member_id, fiscal_year, half])
+  @@index([member_id])
+}
+
 // ===== Client (要件 6-3) =====
 model Client {
-  id                    String   @id @default(cuid())
-  client_code           String   @unique // C-000001 形式（自動採番）
-  company_name          String
-  address               String?
-  billing_contact_name  String?
-  billing_contact_email String?
-  is_active             Boolean  @default(true)
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
+  id           String   @id @default(cuid())
+  client_code  String   @unique // C+3桁（例: C001）。自動採番＋手動変更可
+  company_name String
+  note         String? // 備考（登録画面のみ・一覧には非表示）
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 
-  sales SalesEntry[]
+  sales    SalesEntry[]
+  contacts Contact[]
 
   @@index([is_active])
+}
+
+// ===== Contact 取引先の担当者（1取引先に複数） =====
+model Contact {
+  id             String  @id @default(cuid())
+  name           String // 担当者名
+  contact_method String? // 連絡手段（自由記載: メール/Slack等）
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  client_id String
+  client    Client @relation(fields: [client_id], references: [id], onDelete: Cascade)
+
+  @@index([client_id])
 }
 
 // ===== SalesEntry (要件 6-4) =====

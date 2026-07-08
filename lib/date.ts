@@ -74,6 +74,17 @@ export function currentFiscalYear(): number {
   return fiscalYearOf(currentMonthStart());
 }
 
+/** 月初(UTC)が属する会計上の半期（1=上期 4〜9月 / 2=下期 10〜3月） */
+export function fiscalHalfOf(monthStart: Date): number {
+  const m = monthStart.getUTCMonth() + 1; // 1..12
+  return m >= FISCAL_START_MONTH && m <= FISCAL_START_MONTH + 5 ? 1 : 2;
+}
+
+/** 現在の会計半期（1 or 2） */
+export function currentFiscalHalf(): number {
+  return fiscalHalfOf(currentMonthStart());
+}
+
 /** 会計年度の [開始月初, 翌年度開始月初) を返す（範囲検索用） */
 export function fiscalYearRange(fy: number): { start: Date; endExclusive: Date } {
   const start = new Date(Date.UTC(fy, FISCAL_START_MONTH - 1, 1));

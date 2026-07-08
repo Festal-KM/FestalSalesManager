@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  ClipboardList,
   Receipt,
   Users,
   Building2,
@@ -19,6 +20,7 @@ import type { Role } from "@/app/generated/prisma/enums";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "ダッシュボード", icon: LayoutDashboard },
+  { href: "/my", label: "個人実績表", icon: ClipboardList },
   { href: "/sales", label: "売上一覧", icon: Receipt },
   { href: "/members", label: "メンバー一覧", icon: Users },
   { href: "/clients", label: "取引先一覧", icon: Building2 },

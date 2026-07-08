@@ -1,21 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { saveClient, deactivateClient, type ClientFormState } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ContactRows, type ContactRow } from "./contact-rows";
 
 export type ClientFormData = {
   id: string;
   client_code: string;
   company_name: string;
-  address: string | null;
-  billing_contact_name: string | null;
-  billing_contact_email: string | null;
+  note: string | null;
   is_active: boolean;
+  contacts: ContactRow[];
 };
 
 const initial: ClientFormState = {};
@@ -23,11 +24,20 @@ const initial: ClientFormState = {};
 export function ClientForm({
   mode,
   client,
+  suggestedCode,
 }: {
   mode: "new" | "edit";
   client?: ClientFormData;
+  suggestedCode?: string;
 }) {
   const [state, formAction, isPending] = useActionState(saveClient, initial);
+
+  const [clientCode, setClientCode] = useState(
+    client?.client_code ?? suggestedCode ?? "",
+  );
+  const [companyName, setCompanyName] = useState(client?.company_name ?? "");
+  const [note, setNote] = useState(client?.note ?? "");
+  const [isActive, setIsActive] = useState(client?.is_active ?? true);
 
   return (
     <div className="max-w-xl space-y-4">
@@ -35,12 +45,20 @@ export function ClientForm({
         {mode === "edit" && <input type="hidden" name="id" value={client!.id} />}
 
         <div>
-          <Label>取引先ID</Label>
+          <Label htmlFor="client_code" required>
+            取引先ID
+          </Label>
           <Input
-            value={mode === "edit" ? client!.client_code : "（保存時に自動採番されます）"}
-            readOnly
-            disabled
+            id="client_code"
+            name="client_code"
+            value={clientCode}
+            onChange={(e) => setClientCode(e.target.value)}
+            placeholder="C001"
+            className="w-40"
           />
+          <p className="mt-1 text-xs text-muted-fg">
+            C＋3桁の数字（自動採番されますが変更できます）。
+          </p>
         </div>
 
         <div>
@@ -50,32 +68,23 @@ export function ClientForm({
           <Input
             id="company_name"
             name="company_name"
-            defaultValue={client?.company_name ?? ""}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
             autoFocus
           />
         </div>
 
-        <div>
-          <Label htmlFor="address">会社所在地</Label>
-          <Input id="address" name="address" defaultValue={client?.address ?? ""} />
-        </div>
+        {/* 担当者（複数・＋で追加） */}
+        <ContactRows initial={client?.contacts} />
 
         <div>
-          <Label htmlFor="billing_contact_name">請求担当者</Label>
-          <Input
-            id="billing_contact_name"
-            name="billing_contact_name"
-            defaultValue={client?.billing_contact_name ?? ""}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="billing_contact_email">請求担当者メール</Label>
-          <Input
-            id="billing_contact_email"
-            name="billing_contact_email"
-            type="email"
-            defaultValue={client?.billing_contact_email ?? ""}
+          <Label htmlFor="note">備考</Label>
+          <Textarea
+            id="note"
+            name="note"
+            rows={3}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
           />
         </div>
 
@@ -84,7 +93,8 @@ export function ClientForm({
             <input
               type="checkbox"
               name="is_active"
-              defaultChecked={client!.is_active}
+              checked={isActive}
+              onChange={(e) => setIsActive(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300"
             />
             有効

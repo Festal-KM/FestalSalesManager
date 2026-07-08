@@ -13,7 +13,10 @@ export default async function EditClientPage({
 }) {
   await requireAdmin("/clients"); // 要件23-2 Admin専用
   const { id } = await params;
-  const c = await prisma.client.findUnique({ where: { id } });
+  const c = await prisma.client.findUnique({
+    where: { id },
+    include: { contacts: { orderBy: { created_at: "asc" } } },
+  });
   if (!c) redirect("/clients");
 
   return (
@@ -25,10 +28,12 @@ export default async function EditClientPage({
           id: c.id,
           client_code: c.client_code,
           company_name: c.company_name,
-          address: c.address,
-          billing_contact_name: c.billing_contact_name,
-          billing_contact_email: c.billing_contact_email,
+          note: c.note,
           is_active: c.is_active,
+          contacts: c.contacts.map((x) => ({
+            name: x.name,
+            contact_method: x.contact_method ?? "",
+          })),
         }}
       />
     </div>

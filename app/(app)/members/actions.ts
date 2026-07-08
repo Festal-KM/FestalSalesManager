@@ -122,6 +122,36 @@ export async function saveMember(
   redirect("/members");
 }
 
+export type AdminMissionState = { error?: string; ok?: boolean };
+
+/** 管理者が課すミッションを設定（メンバー×会計年度×半期）。Admin専用 */
+export async function saveAdminMission(
+  _prev: AdminMissionState,
+  formData: FormData,
+): Promise<AdminMissionState> {
+  await requireAdmin();
+
+  const member_id = String(formData.get("member_id") ?? "").trim();
+  const fyRaw = String(formData.get("fiscal_year") ?? "").trim();
+  const half = Number(String(formData.get("half") ?? "").trim());
+  const fiscal_year = Number(fyRaw);
+  if (!member_id || !/^\d{4}$/.test(fyRaw) || (half !== 1 && half !== 2)) {
+    return { error: "入力内容を確認してください" };
+  }
+  const admin_mission =
+    String(formData.get("admin_mission") ?? "").trim() || null;
+
+  await prisma.mission.upsert({
+    where: { member_id_fiscal_year_half: { member_id, fiscal_year, half } },
+    update: { admin_mission },
+    create: { member_id, fiscal_year, half, admin_mission },
+  });
+
+  revalidatePath(`/members/${member_id}/edit`);
+  revalidatePath("/my");
+  return { ok: true };
+}
+
 /** S31 無効化（is_active=false）。要件20-12 */
 export async function deactivateMember(formData: FormData): Promise<void> {
   await requireAdmin();
