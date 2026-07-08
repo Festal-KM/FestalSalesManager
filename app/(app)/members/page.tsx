@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus, Pencil, Eye } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth-helpers";
+import { getCurrentUser, requireAdminPage } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,7 @@ export const metadata = { title: "メンバー一覧 | 成績管理ツール" };
 type SP = Promise<{ keyword?: string; employment?: string; active?: string }>;
 
 export default async function MembersPage({ searchParams }: { searchParams: SP }) {
+  await requireAdminPage(); // 一般ユーザーは /my へ
   const user = await getCurrentUser();
   const isAdmin = user?.role === "Admin";
   const sp = await searchParams;

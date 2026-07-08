@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireAdmin } from "@/lib/auth-helpers";
+import { requireAdminPage } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { ClientForm } from "../../client-form";
@@ -11,7 +11,7 @@ export default async function EditClientPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin("/clients"); // 要件23-2 Admin専用
+  await requireAdminPage(); // 要件23-2 Admin専用（一般ユーザーは /my へ）
   const { id } = await params;
   const c = await prisma.client.findUnique({
     where: { id },

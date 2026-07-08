@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth-helpers";
+import { requireAdminPage } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { ClientForm } from "../client-form";
@@ -6,7 +6,7 @@ import { ClientForm } from "../client-form";
 export const metadata = { title: "取引先登録 | 成績管理ツール" };
 
 export default async function NewClientPage() {
-  await requireAdmin("/clients"); // 要件23-2 Admin専用
+  await requireAdminPage(); // 要件23-2 Admin専用（一般ユーザーは /my へ）
   const seq = await prisma.numberSequence.findUnique({
     where: { seq_key: "CLIENT" },
   });

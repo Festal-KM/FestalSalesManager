@@ -17,9 +17,11 @@ const initial: SalesFormState = {};
 export function SalesBulkForm({
   members,
   clients,
+  contract,
 }: {
   members: MemberOption[];
   clients: ClientOption[];
+  contract: string;
 }) {
   const [state, formAction, isPending] = useActionState(createSalesBulk, initial);
 
@@ -31,10 +33,26 @@ export function SalesBulkForm({
   const [endMonth, setEndMonth] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
+  const [purchaseCost, setPurchaseCost] = useState("");
+
+  const selectedMember = members.find((m) => m.id === memberId);
+  const isOutsource = selectedMember?.employment_type === "Outsource";
+
+  // メンバー選択時、外注ならメンバー登録の仕入単価を初期値として引き込む
+  const onMemberChange = (id: string) => {
+    setMemberId(id);
+    const m = members.find((x) => x.id === id);
+    if (m?.employment_type === "Outsource") {
+      setPurchaseCost(m.purchase_unit_price ?? "");
+    } else {
+      setPurchaseCost("");
+    }
+  };
 
   return (
     <div className="max-w-xl space-y-4">
       <form action={formAction} className="space-y-4">
+        <input type="hidden" name="contract" value={contract} />
         <div>
           <Label htmlFor="b_member_id" required>
             メンバー
@@ -43,7 +61,7 @@ export function SalesBulkForm({
             id="b_member_id"
             name="member_id"
             value={memberId}
-            onChange={(e) => setMemberId(e.target.value)}
+            onChange={(e) => onMemberChange(e.target.value)}
           >
             <option value="">（選択してください）</option>
             {members.map((m) => (
@@ -114,8 +132,33 @@ export function SalesBulkForm({
           />
         </div>
 
-        {/* 計上経費（任意・複数可）— 各月に同じ内容で計上 */}
+        {/* コスト（任意・複数可）— 各月に同じ内容で計上 */}
         <ExpenseRows />
+
+        {/* 外注のみ: メンバーの仕入単価を自動表示（編集可）。コストと同デザイン */}
+        {isOutsource && (
+          <div className="rounded-md border border-gray-200 p-3">
+            <div className="mb-3 text-sm font-medium text-gray-700">
+              仕入単価（外注・各月に計上）
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="purchase_cost">仕入単価（月額・円）</Label>
+                <Input
+                  id="purchase_cost"
+                  name="purchase_cost"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={purchaseCost}
+                  onChange={(e) => setPurchaseCost(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-muted-fg">
+                  メンバー登録の仕入単価を自動入力しています（変更可）。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <Label htmlFor="b_memo">メモ</Label>
@@ -139,7 +182,7 @@ export function SalesBulkForm({
             登録
           </Button>
           <Link
-            href="/sales"
+            href={`/sales?contract=${contract}`}
             className="inline-flex h-10 items-center rounded-md bg-backbtn px-4 text-sm font-medium text-backbtn-fg hover:bg-backbtn-hover hover:text-backbtn-fg-hover"
           >
             キャンセル

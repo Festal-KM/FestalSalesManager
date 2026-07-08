@@ -13,7 +13,7 @@ import {
 } from "@/lib/date";
 import { formatYen } from "@/lib/format";
 import { EMPLOYMENT_LABELS } from "@/lib/enums";
-import { syncDueSalesStatuses } from "@/lib/sales-sync";
+import { requireAdminPage } from "@/lib/auth-helpers";
 
 export const metadata = { title: "ダッシュボード | 成績管理ツール" };
 
@@ -30,21 +30,17 @@ const FIRST_HALF_MONTHS = [4, 5, 6, 7, 8, 9];
 const SECOND_HALF_MONTHS = [10, 11, 12, 1, 2, 3];
 
 export default async function DashboardPage({ searchParams }: { searchParams: SP }) {
+  await requireAdminPage(); // 一般ユーザーは /my へ
   const sp = await searchParams;
-
-  // 到来済み（前月以前）の見込みを実績へ自動反映（冪等）
-  try {
-    await syncDueSalesStatuses();
-  } catch {
-    // 反映に失敗しても画面表示は継続する
-  }
 
   const curFy = currentFiscalYear();
   const fy = sp.fy && /^\d{4}$/.test(sp.fy) ? Number(sp.fy) : curFy;
 
   const { start: fyStart, endExclusive: fyEnd } = fiscalYearRange(fy);
+  // ダッシュボードは準委任のみ集計（請負委任・その他は後日反映予定）
   const fyWhere = {
     is_deleted: false,
+    contract_type: "SemiDelegation" as const,
     period_month: { gte: fyStart, lt: fyEnd },
   };
 
@@ -59,8 +55,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
     ),
   );
 
-  const [fyTotal, fyProper, fyOutsource, perMember, members, monthly] =
-    await Promise.all([
+  const [
+    fyTotal,
+    fyProper,
+    fyOutsource,
+    perMember,
+    members,
+    monthly,
+    fyCostEntries,
+    costMonthlyEntries,
+  ] = await Promise.all([
       // 当期売上見込み（実績+見込みを合算 = 全ステータス）
       prisma.salesEntry.aggregate({ _sum: { amount: true }, where: fyWhere }),
       prisma.salesEntry.aggregate({
@@ -91,8 +95,33 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
       // 直近12ヶ月の月次売上合計
       prisma.salesEntry.groupBy({
         by: ["period_month"],
-        where: { is_deleted: false, period_month: { gte: chartStart, lt: chartEnd } },
+        where: {
+          is_deleted: false,
+          contract_type: "SemiDelegation",
+          period_month: { gte: chartStart, lt: chartEnd },
+        },
         _sum: { amount: true },
+      }),
+      // 当期コスト（経費＋仕入単価）用の明細
+      prisma.salesEntry.findMany({
+        where: fyWhere,
+        select: {
+          purchase_cost: true,
+          expenses: { select: { amount: true } },
+        },
+      }),
+      // 直近12ヶ月のコスト用の明細
+      prisma.salesEntry.findMany({
+        where: {
+          is_deleted: false,
+          contract_type: "SemiDelegation",
+          period_month: { gte: chartStart, lt: chartEnd },
+        },
+        select: {
+          period_month: true,
+          purchase_cost: true,
+          expenses: { select: { amount: true } },
+        },
       }),
     ]);
 
@@ -121,6 +150,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
     value: monthlyMap.get(toYYYYMM(d)) ?? 0,
   }));
 
+  // 当期コスト合計（経費＋仕入単価）
+  let fyExpenseTotal = 0;
+  let fyPurchaseTotal = 0;
+  for (const e of fyCostEntries) {
+    fyPurchaseTotal += decToNum(e.purchase_cost);
+    for (const ex of e.expenses) fyExpenseTotal += decToNum(ex.amount);
+  }
+  const fyCostTotal = fyExpenseTotal + fyPurchaseTotal;
+
+  // 直近12ヶ月のコスト推移（経費＋仕入単価）
+  const costByMonth = new Map<string, number>();
+  for (const e of costMonthlyEntries) {
+    const key = toYYYYMM(e.period_month);
+    let c = costByMonth.get(key) ?? 0;
+    c += decToNum(e.purchase_cost);
+    for (const ex of e.expenses) c += decToNum(ex.amount);
+    costByMonth.set(key, c);
+  }
+  const costChartData = months12.map((d) => ({
+    label: `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
+    value: costByMonth.get(toYYYYMM(d)) ?? 0,
+  }));
+
   // 年度セレクタの選択肢（現年度から過去5年 + 翌年度）
   const years = Array.from({ length: 7 }, (_, i) => curFy + 1 - i);
 
@@ -128,7 +180,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
     <div>
       <PageHeader
         title="ダッシュボード"
-        description={`${fy}年度（${fy}年4月〜${fy + 1}年3月）の売上概要`}
+        description={`${fy}年度（${fy}年4月〜${fy + 1}年3月）の売上・コスト概要`}
       />
 
       {/* 上段: 当期売上見込み + 直近12ヶ月推移 */}
@@ -166,6 +218,43 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
           <CardContent>
             <div className="mb-4 text-sm text-muted-fg">直近12ヶ月の売上推移</div>
             <SalesBarChart data={chartData} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 中段: 当期コスト + 直近12ヶ月のコスト推移 */}
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardContent>
+            <div className="text-sm text-muted-fg">
+              当期コスト（経費＋仕入単価）
+            </div>
+            <div className="mt-2 text-3xl font-bold text-brand-dark">
+              {formatYen(fyCostTotal)}
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-muted-fg">
+                  経費（交通費・立替経費・その他）
+                </div>
+                <div className="mt-1 text-lg font-semibold text-brand-dark">
+                  {formatYen(fyExpenseTotal)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-fg">仕入単価</div>
+                <div className="mt-1 text-lg font-semibold text-brand-dark">
+                  {formatYen(fyPurchaseTotal)}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <div className="mb-4 text-sm text-muted-fg">直近12ヶ月のコスト推移</div>
+            <SalesBarChart data={costChartData} />
           </CardContent>
         </Card>
       </div>

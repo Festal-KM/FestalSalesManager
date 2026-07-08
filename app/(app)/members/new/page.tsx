@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/auth-helpers";
+import { requireAdminPage } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { MemberForm } from "../member-form";
@@ -6,7 +6,7 @@ import { MemberForm } from "../member-form";
 export const metadata = { title: "メンバー登録 | 成績管理ツール" };
 
 export default async function NewMemberPage() {
-  await requireAdmin("/members"); // 要件20-2 Admin専用
+  await requireAdminPage(); // 要件20-2 Admin専用（一般ユーザーは /my へ）
   // まだ他メンバーに紐づいていないユーザーのみ選択肢に出す
   const [users, seq] = await Promise.all([
     prisma.user.findMany({

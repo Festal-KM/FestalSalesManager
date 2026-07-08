@@ -28,6 +28,15 @@ export const EXPENSE_TYPE_LABELS = {
   Other: "その他",
 } as const;
 
+export const CONTRACT_TYPE_LABELS = {
+  SemiDelegation: "準委任",
+  Contract: "請負委任",
+  Other: "その他",
+} as const;
+
+export const CONTRACT_TYPES = ["SemiDelegation", "Contract", "Other"] as const;
+export type ContractTypeLit = (typeof CONTRACT_TYPES)[number];
+
 export const EMPLOYMENT_OPTIONS = [
   { value: "Proper", label: EMPLOYMENT_LABELS.Proper },
   { value: "Outsource", label: EMPLOYMENT_LABELS.Outsource },

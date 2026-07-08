@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Check } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getCurrentDbUser, getCurrentUser } from "@/lib/auth-helpers";
-import { applySalesFilter, clearSalesFilter } from "./actions";
+import { requireAdminPage } from "@/lib/auth-helpers";
+import { applySalesFilter, clearSalesFilter, promoteSale } from "./actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
@@ -18,13 +18,16 @@ import {
   EMPLOYMENT_LABELS,
   SALES_STATUS_LABELS,
   EXPENSE_TYPE_LABELS,
+  CONTRACT_TYPE_LABELS,
 } from "@/lib/enums";
-import { syncDueSalesStatuses } from "@/lib/sales-sync";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "売上一覧 | 成績管理ツール" };
 
+type ContractLit = "SemiDelegation" | "Contract" | "Other";
+
 type SP = Promise<{
+  contract?: string;
   start_month?: string;
   end_month?: string;
   status?: string;
@@ -35,25 +38,27 @@ type SP = Promise<{
 }>;
 
 export default async function SalesPage({ searchParams }: { searchParams: SP }) {
-  // 到来済み（前月以前）の見込みを実績へ自動反映（冪等）
-  try {
-    await syncDueSalesStatuses();
-  } catch {
-    // 反映に失敗しても画面表示は継続する
-  }
+  await requireAdminPage(); // 一般ユーザーは /my へ
+  const sp = await searchParams;
 
-  const [user, dbUser, sp] = await Promise.all([
-    getCurrentUser(),
-    getCurrentDbUser(),
-    searchParams,
-  ]);
-  const isAdmin = user?.role === "Admin";
-  const myMemberId = dbUser?.linked_member?.id ?? null;
+  const contract: ContractLit =
+    sp.contract === "Contract" || sp.contract === "Other"
+      ? sp.contract
+      : "SemiDelegation";
 
-  // 開始月・終了月は URL 未指定なら Cookie の記憶値を初期表示に使う（要望）
+  // 開始月・終了月は URL 未指定なら Cookie の記憶値を初期表示に使う。
+  // Cookie は契約区分ごとに独立（区分間で連携させない）。
   const jar = await cookies();
-  const startMonth = (sp.start_month ?? jar.get("sales_start_month")?.value ?? "").trim();
-  const endMonth = (sp.end_month ?? jar.get("sales_end_month")?.value ?? "").trim();
+  const startMonth = (
+    sp.start_month ??
+    jar.get(`sales_start_month_${contract}`)?.value ??
+    ""
+  ).trim();
+  const endMonth = (
+    sp.end_month ??
+    jar.get(`sales_end_month_${contract}`)?.value ??
+    ""
+  ).trim();
   const status = sp.status ?? "all";
   const employment = sp.employment ?? "all";
   const memberId = sp.member_id ?? "";
@@ -71,6 +76,7 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
   const sales = await prisma.salesEntry.findMany({
     where: {
       is_deleted: false, // 要件27
+      contract_type: contract,
       ...periodWhere,
       ...(status !== "all" ? { status: status as "Actual" | "Forecast" } : {}),
       ...(employment !== "all"
@@ -111,21 +117,25 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
     }),
   ]);
 
-  const canEdit = (rowMemberId: string) =>
-    isAdmin || (myMemberId != null && rowMemberId === myMemberId);
-
   return (
     <div>
-      <PageHeader title="売上一覧" description="売上の検索・閲覧">
-        <Link href="/sales/new" className={cn(buttonVariants({ variant: "primary" }))}>
+      <PageHeader
+        title="売上一覧"
+        description={`契約区分：${CONTRACT_TYPE_LABELS[contract]}`}
+      >
+        <Link
+          href={`/sales/new?contract=${contract}`}
+          className={cn(buttonVariants({ variant: "primary" }))}
+        >
           <Plus className="h-4 w-4" />
           売上登録
         </Link>
       </PageHeader>
 
-      {/* 検索条件（要件16-2） */}
+      {/* 検索条件 */}
       <Card className="mb-4 p-4">
         <form action={applySalesFilter} className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <input type="hidden" name="contract" value={contract} />
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">開始月</label>
             <Input type="month" name="start_month" defaultValue={startMonth} />
@@ -200,7 +210,7 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
                 <TH>取引先</TH>
                 <TH className="text-right">売上金額</TH>
                 <TH>予実</TH>
-                <TH>経費</TH>
+                <TH>コスト</TH>
                 <TH>メモ</TH>
                 <TH>操作</TH>
               </TR>
@@ -227,10 +237,18 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
                     </Badge>
                   </TD>
                   <TD>
-                    {s.expenses.length === 0 ? (
+                    {s.expenses.length === 0 && !s.purchase_cost ? (
                       <span className="text-muted-fg">-</span>
                     ) : (
                       <div className="space-y-1">
+                        {s.purchase_cost && (
+                          <div className="whitespace-nowrap text-xs">
+                            <span className="text-muted-fg">仕入単価</span>{" "}
+                            <span className="font-medium">
+                              {formatYen(s.purchase_cost.toString())}
+                            </span>
+                          </div>
+                        )}
                         {s.expenses.map((ex) => (
                           <div key={ex.id} className="whitespace-nowrap text-xs">
                             <span className="text-muted-fg">
@@ -249,7 +267,16 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
                   </TD>
                   <TD className="max-w-40 truncate text-muted-fg">{s.memo ?? "-"}</TD>
                   <TD>
-                    {canEdit(s.member_id) && (
+                    <div className="flex items-center gap-1.5">
+                      {s.status === "Forecast" && (
+                        <form action={promoteSale}>
+                          <input type="hidden" name="id" value={s.id} />
+                          <Button type="submit" variant="light" size="sm" title="実績にする">
+                            <Check className="h-3.5 w-3.5" />
+                            実績にする
+                          </Button>
+                        </form>
+                      )}
                       <Link
                         href={`/sales/${s.id}/edit`}
                         className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
@@ -257,7 +284,7 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
                         <Pencil className="h-3.5 w-3.5" />
                         編集
                       </Link>
-                    )}
+                    </div>
                   </TD>
                 </TR>
               ))}

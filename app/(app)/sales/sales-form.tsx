@@ -17,7 +17,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { SALES_STATUS_OPTIONS } from "@/lib/enums";
 import { ExpenseRows, type ExpenseRow } from "./expense-rows";
 
-export type MemberOption = { id: string; member_code: string; name: string };
+export type MemberOption = {
+  id: string;
+  member_code: string;
+  name: string;
+  employment_type: string;
+  purchase_unit_price: string | null;
+};
 export type ClientOption = { id: string; client_code: string; company_name: string };
 
 export type SalesEntryData = {
@@ -27,6 +33,8 @@ export type SalesEntryData = {
   period_month: string; // "YYYY-MM"
   amount: string;
   status: string;
+  contract_type: string;
+  purchase_cost: string | null;
   memo: string | null;
   expenses: ExpenseRow[];
 };
@@ -53,11 +61,28 @@ export function SalesForm({
   const [clientId, setClientId] = useState(entry?.client_id ?? "");
   const [periodMonth, setPeriodMonth] = useState(entry?.period_month ?? "");
   const [status, setStatus] = useState(entry?.status ?? "");
+  const [purchaseCost, setPurchaseCost] = useState(entry?.purchase_cost ?? "");
+
+  const isOutsource =
+    members.find((m) => m.id === memberId)?.employment_type === "Outsource";
+
+  const onMemberChange = (id: string) => {
+    setMemberId(id);
+    const m = members.find((x) => x.id === id);
+    setPurchaseCost(
+      m?.employment_type === "Outsource" ? (m.purchase_unit_price ?? "") : "",
+    );
+  };
 
   return (
     <div className="max-w-xl space-y-4">
       <form action={formAction} className="space-y-4">
         {mode === "edit" && <input type="hidden" name="id" value={entry!.id} />}
+        <input
+          type="hidden"
+          name="contract"
+          value={entry?.contract_type ?? "SemiDelegation"}
+        />
 
         <div>
           <Label htmlFor="member_id" required>
@@ -67,7 +92,7 @@ export function SalesForm({
             id="member_id"
             name="member_id"
             value={memberId}
-            onChange={(e) => setMemberId(e.target.value)}
+            onChange={(e) => onMemberChange(e.target.value)}
           >
             <option value="">（選択してください）</option>
             {members.map((m) => (
@@ -143,8 +168,28 @@ export function SalesForm({
           />
         </div>
 
-        {/* 計上経費（任意・複数可）— 売上には含めず別枠で記録 */}
+        {/* コスト（任意・複数可）— 売上には含めず別枠で記録 */}
         <ExpenseRows initial={entry?.expenses} />
+
+        {/* 外注のみ: 仕入単価（コストと同デザイン） */}
+        {isOutsource && (
+          <div className="rounded-md border border-gray-200 p-3">
+            <div className="mb-3 text-sm font-medium text-gray-700">仕入単価（外注）</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="purchase_cost">仕入単価（円）</Label>
+                <Input
+                  id="purchase_cost"
+                  name="purchase_cost"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={purchaseCost}
+                  onChange={(e) => setPurchaseCost(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <Label htmlFor="memo">メモ</Label>
@@ -163,7 +208,7 @@ export function SalesForm({
             {mode === "new" ? "登録" : "更新"}
           </Button>
           <Link
-            href="/sales"
+            href={`/sales?contract=${entry?.contract_type ?? "SemiDelegation"}`}
             className="inline-flex h-10 items-center rounded-md bg-backbtn px-4 text-sm font-medium text-backbtn-fg hover:bg-backbtn-hover hover:text-backbtn-fg-hover"
           >
             キャンセル
@@ -175,6 +220,11 @@ export function SalesForm({
       {mode === "edit" && canDelete && (
         <form action={deleteSales} className="border-t border-gray-100 pt-4">
           <input type="hidden" name="id" value={entry!.id} />
+          <input
+            type="hidden"
+            name="contract"
+            value={entry?.contract_type ?? "SemiDelegation"}
+          />
           <Button type="submit" variant="destructive">
             この売上を削除する（論理削除）
           </Button>

@@ -34,10 +34,17 @@ enum SalesStatus {
   Forecast
 }
 
-// 計上経費の区分（売上には計上しない支出。将来の利益計算=売上−経費 用に記録）
+// 計上経費（コスト）の区分（売上には計上しない支出。将来の利益計算用に記録）
 enum ExpenseType {
   Transportation // 交通費
   Reimbursement // 立替経費
+  Other // その他
+}
+
+// 契約区分（サイドバー「売上一覧」の準委任/請負委任/その他）
+enum ContractType {
+  SemiDelegation // 準委任
+  Contract // 請負委任
   Other // その他
 }
 
@@ -149,13 +156,16 @@ model SalesEntry {
   period_month DateTime    @db.Date // 月初1日で保存（時刻なし）
   amount       Decimal     @db.Decimal(14, 2)
   status       SalesStatus
+  contract_type ContractType @default(SemiDelegation) // 準委任/請負委任/その他
   memo         String?
   year         Int
   half         Int // 1 or 2
   month        Int // 1..12
   is_deleted   Boolean     @default(false) // 論理削除
 
-  // 計上経費（任意・複数可）。売上(amount)には含めず、別枠で記録する。
+  // 外注の仕入単価（コスト）。売上(amount)には含めない。
+  purchase_cost Decimal? @db.Decimal(14, 2)
+  // 計上経費（コスト・任意・複数可）。売上(amount)には含めず、別枠で記録する。
   expenses     Expense[]
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt

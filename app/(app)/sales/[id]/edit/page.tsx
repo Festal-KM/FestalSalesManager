@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireUser, getCurrentDbUser } from "@/lib/auth-helpers";
+import { requireAdminPage } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
 import { SalesForm } from "../../sales-form";
@@ -12,7 +12,7 @@ export default async function EditSalesPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const user = await requireUser();
+  await requireAdminPage(); // 一般ユーザーは /my へ
   const { id } = await params;
 
   const entry = await prisma.salesEntry.findUnique({
@@ -22,17 +22,16 @@ export default async function EditSalesPage({
   // 要件18-5 削除済み/存在しない場合は一覧へ
   if (!entry || entry.is_deleted) redirect("/sales");
 
-  // User は自分の売上のみ編集可（要件16-7 / 18）
-  const isAdmin = user.role === "Admin";
-  if (!isAdmin) {
-    const dbUser = await getCurrentDbUser();
-    if (dbUser?.linked_member?.id !== entry.member_id) redirect("/sales");
-  }
-
-  const [members, clients] = await Promise.all([
+  const [membersRaw, clients] = await Promise.all([
     prisma.member.findMany({
       where: { OR: [{ is_active: true }, { id: entry.member_id }] },
-      select: { id: true, member_code: true, name: true },
+      select: {
+        id: true,
+        member_code: true,
+        name: true,
+        employment_type: true,
+        purchase_unit_price: true,
+      },
       orderBy: { member_code: "asc" },
     }),
     prisma.client.findMany({
@@ -42,6 +41,16 @@ export default async function EditSalesPage({
     }),
   ]);
 
+  const members = membersRaw.map((m) => ({
+    id: m.id,
+    member_code: m.member_code,
+    name: m.name,
+    employment_type: m.employment_type,
+    purchase_unit_price: m.purchase_unit_price
+      ? m.purchase_unit_price.toString()
+      : null,
+  }));
+
   return (
     <div>
       <PageHeader title="売上編集" backHref="/sales" />
@@ -49,7 +58,7 @@ export default async function EditSalesPage({
         mode="edit"
         members={members}
         clients={clients}
-        canDelete={isAdmin}
+        canDelete
         entry={{
           id: entry.id,
           member_id: entry.member_id,
@@ -57,6 +66,10 @@ export default async function EditSalesPage({
           period_month: toMonthInputValue(entry.period_month),
           amount: entry.amount.toString(),
           status: entry.status,
+          contract_type: entry.contract_type,
+          purchase_cost: entry.purchase_cost
+            ? entry.purchase_cost.toString()
+            : null,
           memo: entry.memo,
           expenses: entry.expenses.map((e) => ({
             type: e.type,

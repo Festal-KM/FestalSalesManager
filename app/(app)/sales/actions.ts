@@ -20,6 +20,7 @@ export type SalesFormState = { error?: string };
 // ===== 売上一覧の絞り込み =====
 // 開始月・終了月は Cookie に記憶し、次回以降 URL 未指定でも復元する（要望）。
 const SALES_FILTER_FIELDS = [
+  "contract",
   "start_month",
   "end_month",
   "status",
@@ -28,22 +29,31 @@ const SALES_FILTER_FIELDS = [
   "client_id",
   "keyword",
 ] as const;
-const COOKIE_START = "sales_start_month";
-const COOKIE_END = "sales_end_month";
 const COOKIE_OPTS = { sameSite: "lax" as const, path: "/", maxAge: 60 * 60 * 24 * 365 };
+// 開始月・終了月の記憶は契約区分ごとに独立させる（区分間で連携させない）
+function normContract(v: string): string {
+  return v === "Contract" || v === "Other" ? v : "SemiDelegation";
+}
+function startCookie(contract: string): string {
+  return `sales_start_month_${normContract(contract)}`;
+}
+function endCookie(contract: string): string {
+  return `sales_end_month_${normContract(contract)}`;
+}
 
-/** 検索実行：開始月・終了月を記憶しつつ、条件を URL に載せて再表示 */
+/** 検索実行：開始月・終了月を（契約区分ごとに）記憶しつつ、条件を URL に載せて再表示 */
 export async function applySalesFilter(formData: FormData): Promise<void> {
   await requireUser();
   const get = (k: string) => String(formData.get(k) ?? "").trim();
 
+  const contract = normContract(get("contract"));
   const start = get("start_month");
   const end = get("end_month");
   const jar = await cookies();
-  if (start) jar.set(COOKIE_START, start, COOKIE_OPTS);
-  else jar.delete(COOKIE_START);
-  if (end) jar.set(COOKIE_END, end, COOKIE_OPTS);
-  else jar.delete(COOKIE_END);
+  if (start) jar.set(startCookie(contract), start, COOKIE_OPTS);
+  else jar.delete(startCookie(contract));
+  if (end) jar.set(endCookie(contract), end, COOKIE_OPTS);
+  else jar.delete(endCookie(contract));
 
   const params = new URLSearchParams();
   for (const k of SALES_FILTER_FIELDS) {
@@ -54,13 +64,55 @@ export async function applySalesFilter(formData: FormData): Promise<void> {
   redirect(qs ? `/sales?${qs}` : "/sales");
 }
 
-/** 条件クリア：記憶した開始月・終了月も消去 */
-export async function clearSalesFilter(): Promise<void> {
+/** 条件クリア：その契約区分の記憶した開始月・終了月のみ消去 */
+export async function clearSalesFilter(formData: FormData): Promise<void> {
   await requireUser();
+  const contract = normContract(String(formData.get("contract") ?? ""));
   const jar = await cookies();
-  jar.delete(COOKIE_START);
-  jar.delete(COOKIE_END);
-  redirect("/sales");
+  jar.delete(startCookie(contract));
+  jar.delete(endCookie(contract));
+  redirect(`/sales?contract=${contract}`);
+}
+
+/** 一覧からワンタップで 見込み(Forecast) → 実績(Actual) に更新 */
+export async function promoteSale(formData: FormData): Promise<void> {
+  await requireAdmin("/my");
+  const id = String(formData.get("id") ?? "").trim();
+  if (id) {
+    const target = await prisma.salesEntry.findUnique({
+      where: { id },
+      select: {
+        is_deleted: true,
+        status: true,
+        period_month: true,
+        member: { select: { member_code: true } },
+        client: { select: { client_code: true } },
+      },
+    });
+    if (target && !target.is_deleted && target.status === "Forecast") {
+      const newKey = buildSalesKey({
+        memberCode: target.member.member_code,
+        clientCode: target.client.client_code,
+        monthStart: target.period_month,
+        status: "Actual",
+      });
+      // 既に同一の実績キーがある場合は二重計上を避けて見込みを論理削除
+      const taken = await prisma.salesEntry.findUnique({
+        where: { sales_key: newKey },
+        select: { id: true },
+      });
+      if (taken) {
+        await prisma.salesEntry.update({ where: { id }, data: { is_deleted: true } });
+      } else {
+        await prisma.salesEntry.update({
+          where: { id },
+          data: { status: "Actual", sales_key: newKey },
+        });
+      }
+    }
+  }
+  revalidatePath("/sales");
+  revalidatePath("/dashboard");
 }
 
 type ParsedInput = {
@@ -142,6 +194,27 @@ function parseExpenses(
     out.push({ type, amount: amountRaw, note: type === "Other" ? note : null });
   }
   return { expenses: out };
+}
+
+type ContractLit = "SemiDelegation" | "Contract" | "Other";
+
+/** 契約区分（不正・未指定は準委任にフォールバック） */
+function parseContract(formData: FormData): ContractLit {
+  const v = String(formData.get("contract") ?? "").trim();
+  return v === "Contract" || v === "Other" ? v : "SemiDelegation";
+}
+
+/** 仕入単価（外注コスト）。空なら null、負数はエラー。 */
+function parsePurchaseCost(
+  formData: FormData,
+): { value: string | null } | { error: string } {
+  const raw = String(formData.get("purchase_cost") ?? "").trim();
+  if (raw === "") return { value: null };
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) {
+    return { error: "仕入単価は0以上で入力してください" };
+  }
+  return { value: raw };
 }
 
 // $transaction コールバックの引数型（tx クライアント）
@@ -255,6 +328,7 @@ export async function createSalesBulk(
   const endRaw = String(formData.get("end_month") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const memo = String(formData.get("memo") ?? "").trim();
+  const contract_type = parseContract(formData);
 
   if (!member_id || !client_id || !startRaw || !endRaw || amountRaw === "") {
     return { error: "必須項目を入力してください" };
@@ -265,6 +339,8 @@ export async function createSalesBulk(
   }
   const exp = parseExpenses(formData);
   if ("error" in exp) return { error: exp.error };
+  const purchaseCost = parsePurchaseCost(formData);
+  if ("error" in purchaseCost) return { error: purchaseCost.error };
 
   const start = normalizeToMonthStart(startRaw);
   const end = normalizeToMonthStart(endRaw);
@@ -314,12 +390,14 @@ export async function createSalesBulk(
         period_month: m,
         amount: amountRaw,
         status,
+        contract_type,
         memo: memo || null,
         year,
         half,
         month,
         sales_key,
         is_deleted: false,
+        purchase_cost: purchaseCost.value,
       };
       // sales_key は一意（論理削除行も含む）。存在すれば更新（＝復活）、無ければ作成。
       const target = await tx.salesEntry.findUnique({
@@ -357,7 +435,7 @@ export async function createSalesBulk(
 
   revalidatePath("/sales");
   revalidatePath("/dashboard");
-  redirect("/sales");
+  redirect(`/sales?contract=${contract_type}`);
 }
 
 /** S22 売上編集 要件18 */
@@ -411,6 +489,10 @@ export async function updateSales(
   });
   if (dup) return { error: "同一条件の売上が既に存在します（重複）" };
 
+  const contract_type = parseContract(formData);
+  const purchaseCost = parsePurchaseCost(formData);
+  if ("error" in purchaseCost) return { error: purchaseCost.error };
+
   await prisma.$transaction(async (tx) => {
     await tx.salesEntry.update({
       where: { id },
@@ -420,19 +502,21 @@ export async function updateSales(
         period_month: monthStart,
         amount: i.amountRaw,
         status: i.status as StatusLit,
+        contract_type,
         memo: i.memo || null,
         year,
         half,
         month,
         sales_key,
         updated_by_id: user.id,
+        purchase_cost: purchaseCost.value,
       },
     });
     await replaceExpenses(tx, id, exp.expenses);
   });
 
   revalidatePath("/sales");
-  redirect("/sales");
+  redirect(`/sales?contract=${contract_type}`);
 }
 
 /** S22 論理削除（要件18-9 / 27）Admin専用 */
@@ -445,6 +529,7 @@ export async function deleteSales(formData: FormData): Promise<void> {
       data: { is_deleted: true, updated_by_id: admin.id },
     });
   }
+  const contract = String(formData.get("contract") ?? "").trim();
   revalidatePath("/sales");
-  redirect("/sales");
+  redirect(contract ? `/sales?contract=${contract}` : "/sales");
 }

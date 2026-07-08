@@ -22,6 +22,16 @@ export async function requireAdmin(redirectTo = "/dashboard") {
   return user;
 }
 
+/**
+ * Admin専用ページ用ガード。一般ユーザー(User)は個人実績(/my)へ回す。
+ * ユーザーは /my のみ閲覧、管理者は全ページ閲覧、という権限分離に使う。
+ */
+export async function requireAdminPage() {
+  const user = await requireUser();
+  if (user.role !== "Admin") redirect("/my");
+  return user;
+}
+
 /** Admin 判定（UI 出し分け用） */
 export async function isAdmin() {
   const user = await getCurrentUser();
