@@ -120,6 +120,7 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
   return (
     <div>
       <PageHeader
+        eyebrow="Sales"
         title="売上一覧"
         description={`契約区分：${CONTRACT_TYPE_LABELS[contract]}`}
       >

@@ -179,26 +179,31 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
   return (
     <div>
       <PageHeader
+        eyebrow="Dashboard"
         title="ダッシュボード"
-        description={`${fy}年度（${fy}年4月〜${fy + 1}年3月）の売上・コスト概要`}
-      />
+        description={`${fy}年度（${fy}年4月〜${fy + 1}年3月）の売上・コスト概要 ・ 準委任`}
+      >
+        <FiscalYearSelect years={years} value={fy} />
+      </PageHeader>
 
       {/* 上段: 当期売上見込み + 直近12ヶ月推移 */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardContent>
-            <div className="text-sm text-muted-fg">
+            <div className="eyebrow text-brand">Sales Forecast</div>
+            <div className="mt-1 text-sm text-muted-fg">
               当期売上見込み（実績＋見込み）
             </div>
-            <div className="mt-2 text-3xl font-bold text-brand-dark">
+            <div className="mt-3 tnum text-[2rem] font-semibold leading-none text-ink">
               {formatYen(decToNum(fyTotal._sum.amount))}
             </div>
+            <div className="mt-2 h-px w-14 bg-brand" />
             <div className="mt-5 grid grid-cols-2 gap-4">
               <div>
                 <div className="text-xs text-muted-fg">
                   {EMPLOYMENT_LABELS.Proper}
                 </div>
-                <div className="mt-1 text-lg font-semibold text-brand-dark">
+                <div className="mt-1 tnum text-lg font-semibold text-ink">
                   {formatYen(decToNum(fyProper._sum.amount))}
                 </div>
               </div>
@@ -206,7 +211,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
                 <div className="text-xs text-muted-fg">
                   {EMPLOYMENT_LABELS.Outsource}
                 </div>
-                <div className="mt-1 text-lg font-semibold text-brand-dark">
+                <div className="mt-1 tnum text-lg font-semibold text-ink">
                   {formatYen(decToNum(fyOutsource._sum.amount))}
                 </div>
               </div>
@@ -216,34 +221,39 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
 
         <Card>
           <CardContent>
-            <div className="mb-4 text-sm text-muted-fg">直近12ヶ月の売上推移</div>
+            <div className="eyebrow text-brand">Sales Trend</div>
+            <div className="mb-4 mt-1 text-sm text-muted-fg">
+              直近12ヶ月の売上推移
+            </div>
             <SalesBarChart data={chartData} />
           </CardContent>
         </Card>
       </div>
 
       {/* 中段: 当期コスト + 直近12ヶ月のコスト推移 */}
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardContent>
-            <div className="text-sm text-muted-fg">
+            <div className="eyebrow text-brand-light">Cost</div>
+            <div className="mt-1 text-sm text-muted-fg">
               当期コスト（経費＋仕入単価）
             </div>
-            <div className="mt-2 text-3xl font-bold text-brand-dark">
+            <div className="mt-3 tnum text-[2rem] font-semibold leading-none text-ink">
               {formatYen(fyCostTotal)}
             </div>
+            <div className="mt-2 h-px w-14 bg-brand-light" />
             <div className="mt-5 grid grid-cols-2 gap-4">
               <div>
                 <div className="text-xs text-muted-fg">
                   経費（交通費・立替経費・その他）
                 </div>
-                <div className="mt-1 text-lg font-semibold text-brand-dark">
+                <div className="mt-1 tnum text-lg font-semibold text-ink">
                   {formatYen(fyExpenseTotal)}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-muted-fg">仕入単価</div>
-                <div className="mt-1 text-lg font-semibold text-brand-dark">
+                <div className="mt-1 tnum text-lg font-semibold text-ink">
                   {formatYen(fyPurchaseTotal)}
                 </div>
               </div>
@@ -253,7 +263,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
 
         <Card>
           <CardContent>
-            <div className="mb-4 text-sm text-muted-fg">直近12ヶ月のコスト推移</div>
+            <div className="eyebrow text-brand-light">Cost Trend</div>
+            <div className="mb-4 mt-1 text-sm text-muted-fg">
+              直近12ヶ月のコスト推移
+            </div>
             <SalesBarChart data={costChartData} />
           </CardContent>
         </Card>
@@ -261,9 +274,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
 
       {/* 下段: 個人別実績 */}
       <Card>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
-          <h2 className="text-base font-semibold text-gray-900">個人別実績</h2>
-          <FiscalYearSelect years={years} value={fy} />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
+          <div>
+            <div className="eyebrow text-brand">Members</div>
+            <h2 className="mt-1 text-base font-semibold text-ink">個人別実績</h2>
+          </div>
+          <div className="text-xs text-muted-fg">{fy}年度</div>
         </div>
         {rows.length === 0 ? (
           <EmptyState />
@@ -271,41 +287,41 @@ export default async function DashboardPage({ searchParams }: { searchParams: SP
           <Table>
             <THead>
               <TR>
-                <TH className="sticky left-0 z-10 bg-gray-50">メンバー名</TH>
+                <TH className="sticky left-0 z-10 bg-base">メンバー名</TH>
                 {FIRST_HALF_MONTHS.map((mm) => (
                   <TH key={mm} className="text-right">
                     {mm}月
                   </TH>
                 ))}
-                <TH className="bg-gray-100 text-right">上期</TH>
+                <TH className="bg-brand/5 text-right text-brand">上期</TH>
                 {SECOND_HALF_MONTHS.map((mm) => (
                   <TH key={mm} className="text-right">
                     {mm}月
                   </TH>
                 ))}
-                <TH className="bg-gray-100 text-right">下期</TH>
+                <TH className="bg-brand/5 text-right text-brand">下期</TH>
               </TR>
             </THead>
             <TBody>
               {rows.map((r) => (
-                <TR key={r.member.id}>
-                  <TD className="sticky left-0 z-10 bg-white">
+                <TR key={r.member.id} className="group">
+                  <TD className="sticky left-0 z-10 bg-white group-hover:bg-base">
                     <div className="font-medium">{r.member.name}</div>
                   </TD>
                   {FIRST_HALF_MONTHS.map((mm) => (
-                    <TD key={mm} className="text-right tabular-nums">
+                    <TD key={mm} className="tnum text-right text-muted-fg">
                       {formatYen(r.val(mm))}
                     </TD>
                   ))}
-                  <TD className="bg-gray-50 text-right font-semibold tabular-nums">
+                  <TD className="tnum bg-brand/5 text-right font-semibold text-ink">
                     {formatYen(r.firstHalf)}
                   </TD>
                   {SECOND_HALF_MONTHS.map((mm) => (
-                    <TD key={mm} className="text-right tabular-nums">
+                    <TD key={mm} className="tnum text-right text-muted-fg">
                       {formatYen(r.val(mm))}
                     </TD>
                   ))}
-                  <TD className="bg-gray-50 text-right font-semibold tabular-nums">
+                  <TD className="tnum bg-brand/5 text-right font-semibold text-ink">
                     {formatYen(r.secondHalf)}
                   </TD>
                 </TR>

@@ -52,10 +52,10 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
 
   const linkClass = (active: boolean) =>
     cn(
-      "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+      "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
       active
-        ? "bg-brand-light/20 text-white"
-        : "text-sidebar-fg hover:bg-white/10 hover:text-white",
+        ? "bg-white/10 text-white before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-full before:bg-brand-light"
+        : "text-sidebar-fg hover:bg-white/[0.06] hover:text-white",
       collapsed && "justify-center px-0",
     );
 
@@ -66,20 +66,16 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
         collapsed ? "w-16" : "w-60",
       )}
     >
-      {/* ヘッダー: ロゴ枠（ロゴ実装前のプレースホルダー） */}
+      {/* ヘッダー: ロゴ（透明背景PNG） */}
       <div className="flex h-16 items-center gap-2 border-b border-white/10 px-3">
         {!collapsed && (
-          <div
-            className="flex h-10 flex-1 items-center justify-center rounded-md border border-dashed border-white/25 text-[11px] font-semibold tracking-widest text-white/40"
-            aria-label="ロゴ"
-          >
-            LOGO
-          </div>
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/logo.png" alt="Festal Sales Manager" className="h-9 w-auto" />
         )}
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          className="rounded p-1.5 text-sidebar-fg hover:bg-white/10"
+          className="ml-auto rounded p-1.5 text-sidebar-fg hover:bg-white/10"
           title={collapsed ? "開く" : "閉じる"}
           aria-label={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
         >
@@ -92,7 +88,10 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
       </div>
 
       {/* メニュー */}
-      <nav className="flex-1 space-y-1 px-2 py-2">
+      <nav className="flex-1 space-y-1 px-2 py-3">
+        {!collapsed && (
+          <div className="eyebrow px-3 pb-2 pt-1 text-sidebar-fg/50">Menu</div>
+        )}
         {/* ダッシュボード / 個人実績表 */}
         {navItems
           .filter((i) => i.href === "/dashboard" || i.href === "/my")
@@ -147,10 +146,10 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
                         key={sub.contract}
                         href={`/sales?contract=${sub.contract}`}
                         className={cn(
-                          "block rounded-md px-3 py-1.5 text-sm transition-colors",
+                          "relative block rounded-lg px-3 py-1.5 text-sm transition-colors",
                           active
-                            ? "bg-brand-light/20 text-white"
-                            : "text-sidebar-fg hover:bg-white/10 hover:text-white",
+                            ? "bg-white/10 font-medium text-white"
+                            : "text-sidebar-fg/90 hover:bg-white/[0.06] hover:text-white",
                         )}
                       >
                         {sub.label}
@@ -184,9 +183,14 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
       {/* フッター: ユーザー情報 + ログアウト */}
       <div className="border-t border-white/10 p-2">
         {!collapsed && (
-          <div className="px-2 pb-2 text-xs text-sidebar-fg/80">
-            <div className="truncate font-medium text-white">{loginId}</div>
-            <div>{ROLE_LABELS[role]}</div>
+          <div className="mb-1 flex items-center gap-2.5 rounded-lg px-2 py-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-light/15 text-xs font-semibold uppercase text-brand-light">
+              {loginId.slice(0, 2)}
+            </div>
+            <div className="min-w-0 text-xs">
+              <div className="truncate font-medium text-white">{loginId}</div>
+              <div className="text-sidebar-fg/70">{ROLE_LABELS[role]}</div>
+            </div>
           </div>
         )}
         <form action={signOutAction}>
@@ -194,7 +198,7 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
             type="submit"
             title={collapsed ? "ログアウト" : undefined}
             className={cn(
-              "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-fg transition-colors hover:bg-white/10 hover:text-white",
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-fg transition-colors hover:bg-white/[0.06] hover:text-white",
               collapsed && "justify-center px-0",
             )}
           >

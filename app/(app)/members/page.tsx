@@ -51,7 +51,7 @@ export default async function MembersPage({ searchParams }: { searchParams: SP }
 
   return (
     <div>
-      <PageHeader title="メンバー一覧" description="メンバーの検索・閲覧">
+      <PageHeader eyebrow="Members" title="メンバー一覧" description="メンバーの検索・閲覧">
         {isAdmin && (
           <Link href="/members/new" className={cn(buttonVariants({ variant: "primary" }))}>
             <Plus className="h-4 w-4" />

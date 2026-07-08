@@ -8,7 +8,7 @@ function Select({ className, children, ...props }: React.ComponentProps<"select"
     <div className="relative">
       <select
         className={cn(
-          "flex h-10 w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 pr-8 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-light disabled:cursor-not-allowed disabled:bg-gray-100",
+          "flex h-10 w-full appearance-none rounded-lg border border-line bg-white px-3 py-2 pr-8 text-sm text-ink transition-shadow focus-visible:outline-none focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/25 disabled:cursor-not-allowed disabled:bg-base",
           className,
         )}
         {...props}

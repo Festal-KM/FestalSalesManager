@@ -4,17 +4,17 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-light focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
   {
     variants: {
       variant: {
-        primary: "bg-brand-dark text-white hover:bg-brand-dark/90",
-        light: "bg-brand-light text-white hover:bg-brand-light/90",
-        outline:
-          "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+        primary:
+          "bg-brand text-white shadow-[0_1px_2px_rgba(30,80,210,0.35)] hover:bg-brand/90",
+        light: "bg-brand/10 text-brand hover:bg-brand/15",
+        outline: "border border-line bg-white text-ink hover:bg-base",
         destructive: "bg-alert text-white hover:bg-alert/90",
         back: "bg-backbtn text-backbtn-fg hover:bg-backbtn-hover hover:text-backbtn-fg-hover",
-        ghost: "text-gray-700 hover:bg-gray-100",
+        ghost: "text-ink hover:bg-base",
       },
       size: {
         default: "h-10 px-4 py-2",

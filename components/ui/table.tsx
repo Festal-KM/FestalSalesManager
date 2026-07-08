@@ -10,7 +10,12 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
 }
 
 function THead({ className, ...props }: React.ComponentProps<"thead">) {
-  return <thead className={cn("bg-gray-50", className)} {...props} />;
+  return (
+    <thead
+      className={cn("border-b border-line bg-base/60", className)}
+      {...props}
+    />
+  );
 }
 
 function TBody(props: React.ComponentProps<"tbody">) {
@@ -19,7 +24,13 @@ function TBody(props: React.ComponentProps<"tbody">) {
 
 function TR({ className, ...props }: React.ComponentProps<"tr">) {
   return (
-    <tr className={cn("border-b border-gray-100 last:border-0", className)} {...props} />
+    <tr
+      className={cn(
+        "border-b border-line transition-colors last:border-0 hover:bg-base/50",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
@@ -27,7 +38,7 @@ function TH({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       className={cn(
-        "whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold text-gray-600",
+        "whitespace-nowrap px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-fg",
         className,
       )}
       {...props}
@@ -37,7 +48,7 @@ function TH({ className, ...props }: React.ComponentProps<"th">) {
 
 function TD({ className, ...props }: React.ComponentProps<"td">) {
   return (
-    <td className={cn("whitespace-nowrap px-3 py-2.5 text-gray-800", className)} {...props} />
+    <td className={cn("whitespace-nowrap px-4 py-3 text-ink", className)} {...props} />
   );
 }
 

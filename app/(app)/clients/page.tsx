@@ -46,7 +46,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: SP }
 
   return (
     <div>
-      <PageHeader title="取引先一覧" description="取引先の検索・閲覧">
+      <PageHeader eyebrow="Clients" title="取引先一覧" description="取引先の検索・閲覧">
         {isAdmin && (
           <Link href="/clients/new" className={cn(buttonVariants({ variant: "primary" }))}>
             <Plus className="h-4 w-4" />

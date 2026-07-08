@@ -1,17 +1,20 @@
 @import "tailwindcss";
 
-/* ===== 要件12章 カラー定義（Tailwind v4 テーマトークン） ===== */
+/* ===== Festal Sales Manager — デザイントークン（青×白・落ち着いた高級感） ===== */
 @theme {
-  --color-base: #f5f6fa; /* ベースカラー */
-  --color-brand-dark: #0b1f5e; /* メインカラー濃 */
-  --color-brand-light: #1ea7ff; /* メインカラー淡 */
-  --color-alert: #ef2f15; /* アラート */
-  --color-sidebar-fg: #d0dbef; /* サイドバーフォント */
-  --color-muted-fg: #6b7280; /* 薄め文字 */
-  --color-backbtn: #f3f4f6; /* 戻るボタン背景 */
-  --color-backbtn-hover: #e5e7eb; /* 戻るボタンhover */
-  --color-backbtn-fg: #4b5563; /* 戻るボタンテキスト */
-  --color-backbtn-fg-hover: #374151; /* 戻るボタンテキストhover */
+  --color-base: #f4f7fc; /* キャンバス（クールホワイト） */
+  --color-brand-dark: #0b1f5e; /* ディープネイビー（サイドバー / 見出し） */
+  --color-brand: #1e50d2; /* プライマリ（confident azure） */
+  --color-brand-light: #1ea7ff; /* アクセント（ロゴ由来のシアン・控えめ） */
+  --color-ink: #0e1a33; /* 本文インク */
+  --color-line: #e6eaf3; /* ヘアライン境界 */
+  --color-alert: #e23b2e; /* アラート */
+  --color-sidebar-fg: #aebde0; /* サイドバーフォント */
+  --color-muted-fg: #6b7590; /* 薄め文字 */
+  --color-backbtn: #eef1f8; /* 戻る/サブボタン背景 */
+  --color-backbtn-hover: #e3e8f3;
+  --color-backbtn-fg: #4b5675;
+  --color-backbtn-fg-hover: #33405f;
 
   --font-sans:
     var(--font-geist-sans), system-ui, -apple-system, "Segoe UI",
@@ -19,12 +22,30 @@
 }
 
 :root {
-  --background: #f5f6fa;
-  --foreground: #111827;
+  --background: #f4f7fc;
+  --foreground: #0e1a33;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 数値を等幅で（データの視認性向上） */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* EN eyebrow（英語の小見出し）共通スタイル */
+.eyebrow {
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }

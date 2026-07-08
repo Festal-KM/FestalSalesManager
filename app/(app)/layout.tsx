@@ -13,7 +13,7 @@ export default async function AppLayout({
     <div className="flex min-h-screen bg-base">
       <Sidebar loginId={user.login_id} role={user.role} />
       <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-6xl px-6 py-6">{children}</div>
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:px-8">{children}</div>
       </main>
     </div>
   );
