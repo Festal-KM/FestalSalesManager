@@ -47,3 +47,6 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# ローカルDBバックアップ（機微情報を含む・コミット禁止）
+backups/

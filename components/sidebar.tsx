@@ -8,6 +8,8 @@ import {
   ClipboardList,
   Receipt,
   Users,
+  UserCog,
+  CircleUser,
   Building2,
   LogOut,
   PanelLeftClose,
@@ -25,6 +27,8 @@ const NAV_ITEMS = [
   { href: "/my", label: "個人実績表", icon: ClipboardList, adminOnly: false },
   { href: "/members", label: "メンバー一覧", icon: Users, adminOnly: true },
   { href: "/clients", label: "取引先一覧", icon: Building2, adminOnly: true },
+  { href: "/users", label: "ユーザー管理", icon: UserCog, adminOnly: true },
+  { href: "/account", label: "マイページ", icon: CircleUser, adminOnly: false },
 ];
 
 // 売上一覧の契約区分サブメニュー
@@ -67,15 +71,24 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
       )}
     >
       {/* ヘッダー: ロゴ（透明背景PNG） */}
-      <div className="flex h-16 items-center gap-2 border-b border-white/10 px-3">
+      <div className="relative flex h-24 items-center border-b border-white/10 px-3">
         {!collapsed && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src="/logo.png" alt="Festal Sales Manager" className="h-9 w-auto" />
+          <img
+            src="/logo-sidebar.png"
+            alt="Festal Sales Manager"
+            className="mx-auto h-16 w-auto"
+          />
         )}
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          className="ml-auto rounded p-1.5 text-sidebar-fg hover:bg-white/10"
+          className={cn(
+            "rounded p-1.5 text-sidebar-fg hover:bg-white/10",
+            collapsed
+              ? "mx-auto"
+              : "absolute right-2 top-2",
+          )}
           title={collapsed ? "開く" : "閉じる"}
           aria-label={collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
         >
@@ -161,9 +174,15 @@ export function Sidebar({ loginId, role }: { loginId: string; role: Role }) {
             </div>
           ))}
 
-        {/* メンバー / 取引先 */}
+        {/* メンバー / 取引先 / ユーザー管理 / マイページ */}
         {navItems
-          .filter((i) => i.href === "/members" || i.href === "/clients")
+          .filter(
+            (i) =>
+              i.href === "/members" ||
+              i.href === "/clients" ||
+              i.href === "/users" ||
+              i.href === "/account",
+          )
           .map((item) => {
             const Icon = item.icon;
             return (

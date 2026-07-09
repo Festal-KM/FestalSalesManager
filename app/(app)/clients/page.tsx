@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Pencil } from "lucide-react";
+import { Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireAdminPage } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
@@ -8,9 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { ClientsTable } from "./clients-table";
 
 export const metadata = { title: "取引先一覧 | 成績管理ツール" };
 
@@ -88,70 +87,21 @@ export default async function ClientsPage({ searchParams }: { searchParams: SP }
         {clients.length === 0 ? (
           <EmptyState />
         ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>取引先ID</TH>
-                <TH>会社名</TH>
-                <TH>担当者</TH>
-                <TH>連絡手段</TH>
-                <TH>状態</TH>
-                {isAdmin && <TH>操作</TH>}
-              </TR>
-            </THead>
-            <TBody>
-              {clients.map((c) => (
-                <TR key={c.id}>
-                  <TD className="font-mono text-xs">{c.client_code}</TD>
-                  <TD className="font-medium">{c.company_name}</TD>
-                  <TD>
-                    {c.contacts.length === 0 ? (
-                      <span className="text-muted-fg">-</span>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {c.contacts.map((ct) => (
-                          <div key={ct.id} className="text-xs font-medium">
-                            {ct.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </TD>
-                  <TD>
-                    {c.contacts.length === 0 ? (
-                      <span className="text-muted-fg">-</span>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {c.contacts.map((ct) => (
-                          <div key={ct.id} className="text-xs text-muted-fg">
-                            {ct.contact_method || "-"}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </TD>
-                  <TD>
-                    {c.is_active ? (
-                      <Badge variant="success">有効</Badge>
-                    ) : (
-                      <Badge variant="default">無効</Badge>
-                    )}
-                  </TD>
-                  {isAdmin && (
-                    <TD>
-                      <Link
-                        href={`/clients/${c.id}/edit`}
-                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        編集
-                      </Link>
-                    </TD>
-                  )}
-                </TR>
-              ))}
-            </TBody>
-          </Table>
+          <ClientsTable
+            isAdmin={isAdmin}
+            clients={clients.map((c) => ({
+              id: c.id,
+              client_code: c.client_code,
+              company_name: c.company_name,
+              note: c.note,
+              is_active: c.is_active,
+              contacts: c.contacts.map((ct) => ({
+                id: ct.id,
+                name: ct.name,
+                contact_method: ct.contact_method,
+              })),
+            }))}
+          />
         )}
       </Card>
     </div>

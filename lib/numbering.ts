@@ -16,3 +16,29 @@ export async function nextCode(tx: TxClient, seqKey: string): Promise<string> {
   const num = String(seq.current_no).padStart(seq.pad_digits, "0");
   return `${seq.prefix}${num}`;
 }
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * 空いている最小の連番を採番候補として返す（gap優先）。
+ * 既存コードの数値部分を見て、1 から順に未使用の最小番号を探す。
+ * 例: 0010 だけ使用中なら 0001、0001〜0003 使用中なら 0004。
+ * prefix に一致しない/数値でない手動コードは無視する。
+ */
+export function suggestSmallestFreeCode(
+  existingCodes: string[],
+  prefix: string,
+  padDigits: number,
+): string {
+  const re = new RegExp(`^${escapeRegExp(prefix)}0*(\\d+)$`);
+  const used = new Set<number>();
+  for (const code of existingCodes) {
+    const m = code.match(re);
+    if (m) used.add(parseInt(m[1], 10));
+  }
+  let n = 1;
+  while (used.has(n)) n++;
+  return `${prefix}${String(n).padStart(padDigits, "0")}`;
+}

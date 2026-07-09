@@ -1,26 +1,24 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Plus, Pencil, Check } from "lucide-react";
+import { Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireAdminPage } from "@/lib/auth-helpers";
-import { applySalesFilter, clearSalesFilter, promoteSale } from "./actions";
+import { applySalesFilter, clearSalesFilter } from "./actions";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Card } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { normalizeToMonthStart } from "@/lib/date";
 import { formatYen, formatYearMonth } from "@/lib/format";
 import {
   EMPLOYMENT_LABELS,
   SALES_STATUS_LABELS,
-  EXPENSE_TYPE_LABELS,
   CONTRACT_TYPE_LABELS,
 } from "@/lib/enums";
 import { cn } from "@/lib/utils";
+import { SalesTable } from "./sales-table";
 
 export const metadata = { title: "売上一覧 | 成績管理ツール" };
 
@@ -202,95 +200,27 @@ export default async function SalesPage({ searchParams }: { searchParams: SP }) 
         {sales.length === 0 ? (
           <EmptyState />
         ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>対象月</TH>
-                <TH>メンバー</TH>
-                <TH>雇用区分</TH>
-                <TH>取引先</TH>
-                <TH className="text-right">売上金額</TH>
-                <TH>予実</TH>
-                <TH>コスト</TH>
-                <TH>メモ</TH>
-                <TH>操作</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {sales.map((s) => (
-                <TR key={s.id}>
-                  <TD>{formatYearMonth(s.period_month)}</TD>
-                  <TD>
-                    <div className="font-medium">{s.member.name}</div>
-                  </TD>
-                  <TD>
-                    <Badge variant={s.member.employment_type === "Proper" ? "brand" : "light"}>
-                      {EMPLOYMENT_LABELS[s.member.employment_type]}
-                    </Badge>
-                  </TD>
-                  <TD>
-                    <div className="font-medium">{s.client.company_name}</div>
-                  </TD>
-                  <TD className="text-right font-medium">{formatYen(s.amount.toString())}</TD>
-                  <TD>
-                    <Badge variant={s.status === "Actual" ? "success" : "warning"}>
-                      {SALES_STATUS_LABELS[s.status]}
-                    </Badge>
-                  </TD>
-                  <TD>
-                    {s.expenses.length === 0 && !s.purchase_cost ? (
-                      <span className="text-muted-fg">-</span>
-                    ) : (
-                      <div className="space-y-1">
-                        {s.purchase_cost && (
-                          <div className="whitespace-nowrap text-xs">
-                            <span className="text-muted-fg">仕入単価</span>{" "}
-                            <span className="font-medium">
-                              {formatYen(s.purchase_cost.toString())}
-                            </span>
-                          </div>
-                        )}
-                        {s.expenses.map((ex) => (
-                          <div key={ex.id} className="whitespace-nowrap text-xs">
-                            <span className="text-muted-fg">
-                              {EXPENSE_TYPE_LABELS[ex.type]}
-                            </span>{" "}
-                            <span className="font-medium">
-                              {formatYen(ex.amount.toString())}
-                            </span>
-                            {ex.type === "Other" && ex.note && (
-                              <span className="ml-1 text-muted-fg">（{ex.note}）</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </TD>
-                  <TD className="max-w-40 truncate text-muted-fg">{s.memo ?? "-"}</TD>
-                  <TD>
-                    <div className="flex items-center gap-1.5">
-                      {s.status === "Forecast" && (
-                        <form action={promoteSale}>
-                          <input type="hidden" name="id" value={s.id} />
-                          <Button type="submit" variant="light" size="sm" title="実績にする">
-                            <Check className="h-3.5 w-3.5" />
-                            実績にする
-                          </Button>
-                        </form>
-                      )}
-                      <Link
-                        href={`/sales/${s.id}/edit`}
-                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        編集
-                      </Link>
-                    </div>
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
+          <SalesTable
+            sales={sales.map((s) => ({
+              id: s.id,
+              period: formatYearMonth(s.period_month),
+              memberName: s.member.name,
+              employment_type: s.member.employment_type,
+              clientName: s.client.company_name,
+              amount: formatYen(s.amount.toString()),
+              status: s.status,
+              purchaseCost: s.purchase_cost
+                ? formatYen(s.purchase_cost.toString())
+                : null,
+              expenses: s.expenses.map((ex) => ({
+                id: ex.id,
+                type: ex.type,
+                amount: formatYen(ex.amount.toString()),
+                note: ex.note,
+              })),
+              memo: s.memo,
+            }))}
+          />
         )}
       </Card>
     </div>

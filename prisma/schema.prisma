@@ -29,6 +29,18 @@ enum Gender {
   Unknown
 }
 
+// 役職（給与グレード / 大枠）。給与テーブルの選択に対応。
+enum Grade {
+  Analyst // アナリスト
+  Associate // アソシエイト
+  Consultant // コンサルタント
+  SeniorConsultant // シニアコンサルタント
+  Manager // マネージャー
+  SeniorManager // シニアマネージャー
+  Director // ディレクター
+  Partner // パートナー
+}
+
 enum SalesStatus {
   Actual
   Forecast
@@ -65,7 +77,25 @@ model User {
   created_sales SalesEntry[] @relation("SalesCreatedBy")
   updated_sales SalesEntry[] @relation("SalesUpdatedBy")
 
+  password_reset_tokens PasswordResetToken[]
+
   @@index([is_active])
+}
+
+// ===== PasswordResetToken パスワード再設定トークン =====
+// login_id（メールアドレス）宛に送るリセットリンク用。平文は保存せず sha256 ハッシュで保持。
+// 有効期限あり・単回使用（used_at で消し込み）。
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  token_hash String    @unique // sha256(平文トークン)
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  user_id String
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
 }
 
 // ===== Member (要件 6-2) =====
@@ -76,8 +106,10 @@ model Member {
   age             Int?
   gender          Gender?
   employment_type EmploymentType
-  position        String? // 役職
+  position        String? // 役職（自由入力の肩書き）
   department      String? // 部署
+  grade           Grade? // 役職（給与グレード / 大枠）
+  pitch           Int? // ピッチ（給与テーブルの段位・1始まり）
   // 外注の場合のみ使用
   affiliation         String? // 所属
   purchase_unit_price Decimal? @db.Decimal(14, 2) // 仕入単価

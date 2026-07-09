@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth-helpers";
+import { GRADE_ORDER, GRADE_PARAMS, type GradeKey } from "@/lib/salary-tables";
 
 type EmploymentLit = "Proper" | "Outsource";
 type GenderLit = "Male" | "Female" | "Other" | "Unknown";
@@ -34,6 +35,8 @@ export async function saveMember(
   const department = String(formData.get("department") ?? "").trim();
   const affiliation = String(formData.get("affiliation") ?? "").trim();
   const priceRaw = String(formData.get("purchase_unit_price") ?? "").trim();
+  const gradeRaw = String(formData.get("grade") ?? "").trim();
+  const pitchRaw = String(formData.get("pitch") ?? "").trim();
   const linked_user_id = String(formData.get("linked_user_id") ?? "").trim();
   const is_active = formData.get("is_active") === "on";
 
@@ -66,6 +69,27 @@ export async function saveMember(
       ? (genderRaw as GenderLit)
       : null;
 
+  // 役職（給与グレード）
+  const grade: GradeKey | null =
+    gradeRaw && (GRADE_ORDER as string[]).includes(gradeRaw)
+      ? (gradeRaw as GradeKey)
+      : null;
+
+  // ピッチ（1以上の整数。グレード設定時はそのグレードのピッチ数以内）
+  let pitch: number | null = null;
+  if (pitchRaw !== "") {
+    const n = Number(pitchRaw);
+    if (!Number.isInteger(n) || n < 1) {
+      return { error: "ピッチは1以上の整数で入力してください" };
+    }
+    if (grade && n > GRADE_PARAMS[grade].count) {
+      return {
+        error: `ピッチは1〜${GRADE_PARAMS[grade].count}の範囲で入力してください`,
+      };
+    }
+    pitch = n;
+  }
+
   // メンバーコード重複チェック（@unique でも担保）
   const codeDup = await prisma.member.findFirst({
     where: { member_code, ...(id ? { NOT: { id } } : {}) },
@@ -90,6 +114,8 @@ export async function saveMember(
     employment_type: employment_type as EmploymentLit,
     position: position || null,
     department: department || null,
+    grade,
+    pitch,
     // 外注のみ 所属・仕入単価を保持（プロパーは空に）
     affiliation: isOutsource ? affiliation || null : null,
     purchase_unit_price: isOutsource ? purchase_unit_price : null,

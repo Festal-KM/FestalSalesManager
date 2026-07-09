@@ -22,9 +22,13 @@ export default async function LoginPage() {
       />
       <div className="relative w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center text-center">
-          <div className="mb-5 rounded-2xl bg-brand-dark px-5 py-3 shadow-[0_10px_30px_rgba(11,31,94,0.25)]">
+          <div className="mb-5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Festal Sales Manager" className="h-9 w-auto" />
+            <img
+              src="/logo.png"
+              alt="Festal Sales Manager"
+              className="h-auto w-80 max-w-full"
+            />
           </div>
           <div className="eyebrow text-brand">Welcome back</div>
           <h1 className="mt-2.5 text-2xl font-semibold tracking-tight text-ink">

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { GENDER_OPTIONS, EMPLOYMENT_OPTIONS } from "@/lib/enums";
+import { GRADE_ORDER, GRADE_LABELS } from "@/lib/salary-tables";
 
 export type MemberFormData = {
   id: string;
@@ -19,6 +20,8 @@ export type MemberFormData = {
   employment_type: string;
   position: string | null;
   department: string | null;
+  grade: string | null;
+  pitch: number | null;
   affiliation: string | null;
   purchase_unit_price: string | null;
   linked_user_id: string | null;
@@ -52,6 +55,10 @@ export function MemberForm({
   const [employment, setEmployment] = useState(member?.employment_type ?? "");
   const [position, setPosition] = useState(member?.position ?? "");
   const [department, setDepartment] = useState(member?.department ?? "");
+  const [grade, setGrade] = useState(member?.grade ?? "");
+  const [pitch, setPitch] = useState(
+    member?.pitch != null ? String(member.pitch) : "",
+  );
   const [affiliation, setAffiliation] = useState(member?.affiliation ?? "");
   const [price, setPrice] = useState(member?.purchase_unit_price ?? "");
   const [linkedUserId, setLinkedUserId] = useState(member?.linked_user_id ?? "");
@@ -141,6 +148,39 @@ export function MemberForm({
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
             />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="grade">役職（給与グレード）</Label>
+            <Select
+              id="grade"
+              name="grade"
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+            >
+              <option value="">（未設定）</option>
+              {GRADE_ORDER.map((g) => (
+                <option key={g} value={g}>
+                  {GRADE_LABELS[g]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="pitch">ピッチ</Label>
+            <Input
+              id="pitch"
+              name="pitch"
+              inputMode="numeric"
+              placeholder="例: 1"
+              value={pitch}
+              onChange={(e) => setPitch(e.target.value)}
+            />
+            <p className="mt-1 text-xs text-muted-fg">
+              給与テーブルの段位（1以上の整数）。
+            </p>
           </div>
         </div>
 

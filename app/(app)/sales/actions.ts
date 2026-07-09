@@ -279,15 +279,16 @@ export async function createSales(
   };
 
   await prisma.$transaction(async (tx) => {
-    const existing = await tx.salesEntry.findFirst({
-      where: { sales_key, is_deleted: false },
+    // sales_key は論理削除行も含めて一意。既存があれば更新（論理削除済みなら復活）。
+    const existing = await tx.salesEntry.findUnique({
+      where: { sales_key },
       select: { id: true },
     });
     let entryId: string;
     if (existing) {
       await tx.salesEntry.update({
         where: { id: existing.id },
-        data: { ...common, sales_key, updated_by_id: user.id },
+        data: { ...common, sales_key, is_deleted: false, updated_by_id: user.id },
       });
       entryId = existing.id;
     } else {
@@ -482,7 +483,7 @@ export async function updateSales(
     status: i.status,
   });
 
-  // 要件18-7 自分以外に同一 sales_key があれば重複エラー
+  // 要件18-7 自分以外に同一 sales_key があれば重複エラー（非削除のみ）
   const dup = await prisma.salesEntry.findFirst({
     where: { sales_key, is_deleted: false, NOT: { id } },
     select: { id: true },
@@ -494,6 +495,12 @@ export async function updateSales(
   if ("error" in purchaseCost) return { error: purchaseCost.error };
 
   await prisma.$transaction(async (tx) => {
+    // sales_key は論理削除行も含めて一意。目的キーを論理削除済みの別行が
+    // 保持していると更新時に一意制約違反になるため、先に解放（物理削除）する。
+    // 例: 見込み→実績に昇格した際に論理削除された見込み行が残っているケース。
+    await tx.salesEntry.deleteMany({
+      where: { sales_key, is_deleted: true, NOT: { id } },
+    });
     await tx.salesEntry.update({
       where: { id },
       data: {

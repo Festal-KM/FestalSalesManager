@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { AlertCircle } from "lucide-react";
 import { loginAction, type LoginState } from "./actions";
@@ -51,6 +52,13 @@ export function LoginForm() {
       <Button type="submit" className="w-full" loading={isPending}>
         ログイン
       </Button>
+
+      <Link
+        href="/forgot-password"
+        className="block text-center text-sm text-brand hover:underline"
+      >
+        パスワードをお忘れの方
+      </Link>
     </form>
   );
 }

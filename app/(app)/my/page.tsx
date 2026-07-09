@@ -2,10 +2,15 @@ import Link from "next/link";
 import { getCurrentDbUser } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { EMPLOYMENT_LABELS } from "@/lib/enums";
+import { cn } from "@/lib/utils";
 import {
   currentFiscalYear,
   currentFiscalHalf,
@@ -14,13 +19,15 @@ import {
 import { formatYen } from "@/lib/format";
 import { PeriodSelect } from "./period-select";
 import { MissionPanel } from "./mission-panel";
-import { SalaryInfo } from "./salary-info";
+import { SalaryTable } from "./salary-table";
+import type { GradeKey } from "@/lib/salary-tables";
 import { AdminControls } from "./admin-controls";
 import { AdminMissionEditor } from "./admin-mission-editor";
+import { MemberRow } from "./member-row";
 
 export const metadata = { title: "個人実績表 | 成績管理ツール" };
 
-type SP = Promise<{ fy?: string; half?: string; member?: string }>;
+type SP = Promise<{ fy?: string; half?: string; member?: string; keyword?: string }>;
 
 const FIRST_HALF_MONTHS = [4, 5, 6, 7, 8, 9];
 const SECOND_HALF_MONTHS = [10, 11, 12, 1, 2, 3];
@@ -135,13 +142,35 @@ export default async function MyPage({ searchParams }: { searchParams: SP }) {
 
   // ===== 管理者: メンバー別実績一覧 → ミッション設定 =====
   if (isAdmin) {
-    const members = await prisma.member.findMany({
-      where: { is_active: true },
-      select: { id: true, name: true, member_code: true, employment_type: true },
-      orderBy: { member_code: "asc" },
-    });
     const memberId = sp.member ?? "";
-    const selected = memberId ? members.find((m) => m.id === memberId) : null;
+    const keyword = (sp.keyword ?? "").trim();
+
+    // 選択済みメンバーは検索条件に関わらず解決する
+    const selected = memberId
+      ? await prisma.member.findUnique({
+          where: { id: memberId },
+          select: { id: true, name: true, member_code: true, employment_type: true },
+        })
+      : null;
+
+    // 一覧（未選択時）はキーワードで絞り込み
+    const members = selected
+      ? []
+      : await prisma.member.findMany({
+          where: {
+            is_active: true,
+            ...(keyword
+              ? {
+                  OR: [
+                    { name: { contains: keyword, mode: "insensitive" } },
+                    { member_code: { contains: keyword, mode: "insensitive" } },
+                  ],
+                }
+              : {}),
+          },
+          select: { id: true, name: true, member_code: true, employment_type: true },
+          orderBy: { member_code: "asc" },
+        });
 
     // 一覧（未選択時）: 全メンバーの当年度 上期/下期/年間
     let overview: {
@@ -187,73 +216,95 @@ export default async function MyPage({ searchParams }: { searchParams: SP }) {
           description={
             selected
               ? `${selected.name} さんの実績とミッション設定`
-              : "メンバー別の実績一覧 ・ 行を開くとミッションを設定できます"
+              : "メンバーの検索・閲覧 ・ 行を開くとミッションを設定できます"
           }
           backHref={selected ? `/my?fy=${fy}&half=${half}` : undefined}
         >
-          <AdminControls
-            members={members}
-            memberId={memberId}
-            years={years}
-            fy={fy}
-            half={half}
-          />
+          {selected && (
+            <AdminControls memberId={memberId} years={years} fy={fy} half={half} />
+          )}
         </PageHeader>
 
         {!selected ? (
-          <Card>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-4">
-              <div>
-                <div className="eyebrow text-brand">Members</div>
-                <h2 className="mt-1 text-base font-semibold text-ink">
-                  メンバー別実績
-                </h2>
-              </div>
-              <div className="text-xs text-muted-fg">{fy}年度</div>
-            </div>
-            <div className="overflow-x-auto">
-              <div className="min-w-[600px]">
-                {/* ヘッダー行 */}
-                <div className="grid grid-cols-[minmax(0,1.6fr)_auto_1fr_1fr_1fr] items-center gap-4 border-b border-line px-6 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-fg">
-                  <div>メンバー</div>
-                  <div>雇用区分</div>
-                  <div className="text-right">上期</div>
-                  <div className="text-right">下期</div>
-                  <div className="text-right">年間合計</div>
+          <>
+            <Card className="mb-4 p-4">
+              <form method="get" className="flex flex-wrap items-end gap-3">
+                <div className="min-w-56 flex-1">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    キーワード（氏名 / コード）
+                  </label>
+                  <Input name="keyword" defaultValue={keyword} placeholder="氏名 または 0001" />
                 </div>
-                {/* 行全体がリンク */}
-                {overview.map((r) => (
-                  <Link
-                    key={r.member.id}
-                    href={`/my?member=${r.member.id}&fy=${fy}&half=${half}`}
-                    className="grid grid-cols-[minmax(0,1.6fr)_auto_1fr_1fr_1fr] items-center gap-4 border-b border-line px-6 py-3.5 transition-colors last:border-0 hover:bg-base"
-                  >
-                    <div className="truncate font-medium text-ink">
-                      {r.member.name}
-                    </div>
-                    <div>
-                      <Badge
-                        variant={
-                          r.member.employment_type === "Proper" ? "brand" : "light"
-                        }
+                <div className="w-36">
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    会計年度
+                  </label>
+                  <Select name="fy" defaultValue={String(fy)}>
+                    {years.map((y) => (
+                      <option key={y} value={y}>
+                        {y}年度
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <input type="hidden" name="half" value={half} />
+                <Button type="submit" variant="light">
+                  検索
+                </Button>
+                <Link href="/my" className={cn(buttonVariants({ variant: "back" }))}>
+                  条件クリア
+                </Link>
+              </form>
+            </Card>
+
+            <Card>
+              {overview.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>メンバーコード</TH>
+                      <TH>氏名</TH>
+                      <TH>雇用区分</TH>
+                      <TH className="text-right">上期</TH>
+                      <TH className="text-right">下期</TH>
+                      <TH className="text-right">年間合計</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {overview.map((r) => (
+                      <MemberRow
+                        key={r.member.id}
+                        href={`/my?member=${r.member.id}&fy=${fy}&half=${half}`}
                       >
-                        {EMPLOYMENT_LABELS[r.member.employment_type]}
-                      </Badge>
-                    </div>
-                    <div className="tnum text-right text-muted-fg">
-                      {formatYen(r.first)}
-                    </div>
-                    <div className="tnum text-right text-muted-fg">
-                      {formatYen(r.second)}
-                    </div>
-                    <div className="tnum text-right font-semibold text-ink">
-                      {formatYen(r.total)}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </Card>
+                        <TD className="font-mono text-xs">{r.member.member_code}</TD>
+                        <TD className="font-medium">{r.member.name}</TD>
+                        <TD>
+                          <Badge
+                            variant={
+                              r.member.employment_type === "Proper" ? "brand" : "light"
+                            }
+                          >
+                            {EMPLOYMENT_LABELS[r.member.employment_type]}
+                          </Badge>
+                        </TD>
+                        <TD className="text-right tabular-nums text-muted-fg">
+                          {formatYen(r.first)}
+                        </TD>
+                        <TD className="text-right tabular-nums text-muted-fg">
+                          {formatYen(r.second)}
+                        </TD>
+                        <TD className="text-right tabular-nums font-semibold">
+                          {formatYen(r.total)}
+                        </TD>
+                      </MemberRow>
+                    ))}
+                  </TBody>
+                </Table>
+              )}
+            </Card>
+          </>
         ) : (
           <>
             <Section title={`${selected.name}｜${fy}年度の実績`}>
@@ -322,7 +373,10 @@ export default async function MyPage({ searchParams }: { searchParams: SP }) {
       </Section>
 
       <Section title="給与体系">
-        <SalaryInfo />
+        <SalaryTable
+          currentGrade={(member.grade as GradeKey | null) ?? null}
+          currentPitch={member.pitch ?? null}
+        />
       </Section>
     </div>
   );

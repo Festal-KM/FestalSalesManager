@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Pencil, Eye } from "lucide-react";
+import { Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireAdminPage } from "@/lib/auth-helpers";
 import { PageHeader } from "@/components/page-header";
@@ -8,10 +8,10 @@ import { Card } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { EMPLOYMENT_LABELS } from "@/lib/enums";
+import { formatYen } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { MembersTable } from "./members-table";
 
 export const metadata = { title: "メンバー一覧 | 成績管理ツール" };
 
@@ -97,63 +97,25 @@ export default async function MembersPage({ searchParams }: { searchParams: SP }
         {members.length === 0 ? (
           <EmptyState />
         ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>メンバーコード</TH>
-                <TH>氏名</TH>
-                <TH>役職</TH>
-                <TH>部署</TH>
-                <TH>雇用区分</TH>
-                <TH>ログインユーザー</TH>
-                <TH>状態</TH>
-                <TH>操作</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {members.map((m) => (
-                <TR key={m.id}>
-                  <TD className="font-mono text-xs">{m.member_code}</TD>
-                  <TD className="font-medium">{m.name}</TD>
-                  <TD>{m.position ?? "-"}</TD>
-                  <TD>{m.department ?? "-"}</TD>
-                  <TD>
-                    <Badge variant={m.employment_type === "Proper" ? "brand" : "light"}>
-                      {EMPLOYMENT_LABELS[m.employment_type]}
-                    </Badge>
-                  </TD>
-                  <TD className="text-muted-fg">{m.linked_user?.login_id ?? "-"}</TD>
-                  <TD>
-                    {m.is_active ? (
-                      <Badge variant="success">有効</Badge>
-                    ) : (
-                      <Badge variant="default">無効</Badge>
-                    )}
-                  </TD>
-                  <TD>
-                    <div className="flex gap-1.5">
-                      <Link
-                        href={`/members/${m.id}`}
-                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        詳細
-                      </Link>
-                      {isAdmin && (
-                        <Link
-                          href={`/members/${m.id}/edit`}
-                          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          編集
-                        </Link>
-                      )}
-                    </div>
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
+          <MembersTable
+            isAdmin={isAdmin}
+            members={members.map((m) => ({
+              id: m.id,
+              member_code: m.member_code,
+              name: m.name,
+              age: m.age,
+              gender: m.gender,
+              position: m.position,
+              department: m.department,
+              employment_type: m.employment_type,
+              affiliation: m.affiliation,
+              purchase_unit_price: m.purchase_unit_price
+                ? formatYen(m.purchase_unit_price.toString())
+                : null,
+              login_id: m.linked_user?.login_id ?? null,
+              is_active: m.is_active,
+            }))}
+          />
         )}
       </Card>
     </div>

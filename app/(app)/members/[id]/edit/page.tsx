@@ -47,6 +47,8 @@ export default async function EditMemberPage({
           employment_type: m.employment_type,
           position: m.position,
           department: m.department,
+          grade: m.grade,
+          pitch: m.pitch,
           affiliation: m.affiliation,
           purchase_unit_price: m.purchase_unit_price
             ? m.purchase_unit_price.toString()
