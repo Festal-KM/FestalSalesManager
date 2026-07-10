@@ -10,6 +10,7 @@ import {
 } from "@/lib/salary-tables";
 import { Select } from "@/components/ui/select";
 import { formatYen } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 function pct(n: number): string {
   const v = n * 100;
@@ -120,20 +121,29 @@ export function SalaryTable({
                   key={r.pitch}
                   className={
                     highlighted
-                      ? "bg-brand/15 ring-1 ring-inset ring-brand/40"
+                      ? "bg-brand/15"
                       : "border-b border-line last:border-0 hover:bg-base/60"
                   }
                 >
-                  <td className="whitespace-nowrap px-3 py-1.5 text-center font-medium">
+                  <td
+                    className={cn(
+                      "whitespace-nowrap px-3 py-1.5 text-center font-medium",
+                      highlighted && "border-y border-l border-brand/40"
+                    )}
+                  >
                     {r.pitch}
                     {highlighted && (
                       <span className="ml-1 text-[10px] font-bold text-brand">●</span>
                     )}
                   </td>
-                  {COLS.map((c) => (
+                  {COLS.map((c, ci) => (
                     <td
                       key={c.key}
-                      className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums"
+                      className={cn(
+                        "whitespace-nowrap px-3 py-1.5 text-right tabular-nums",
+                        highlighted && "border-y border-brand/40",
+                        highlighted && ci === COLS.length - 1 && "border-r"
+                      )}
                     >
                       {formatYen(r[c.key as keyof typeof r] as number)}
                     </td>
