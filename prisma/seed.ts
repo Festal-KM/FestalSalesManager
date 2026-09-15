@@ -3,11 +3,63 @@ import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../app/generated/prisma/client";
 
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
+// SSL は接続文字列の sslmode で制御する（lib/prisma.ts と同じ方針）。
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
+
+type RoleLit = "Admin" | "User";
+
+/**
+ * 必須の環境変数を取り出す。未設定なら停止する。
+ * 初期パスワードをソースに書かないため、既定値は意図的に用意しない。
+ */
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v || v.trim() === "") {
+    throw new Error(
+      `${name} が未設定です。\n` +
+        `初期パスワードをソースコードに書かないため、環境変数を必須にしています。\n` +
+        `  生成例: node -e "console.log(require('crypto').randomBytes(18).toString('base64url'))"`,
+    );
+  }
+  return v;
+}
+
+/**
+ * 既存ユーザーのパスワードを毎回上書きすると、アプリ側で変更した値が
+ * seed 再実行のたびに巻き戻ってしまう。そのため上書きは明示的なオプトインに限る。
+ */
+const FORCE_PW_RESET = process.env.SEED_FORCE_PASSWORD_RESET === "true";
+
+async function upsertUser(loginId: string, plainPw: string, role: RoleLit) {
+  const hash = await bcrypt.hash(plainPw, 10);
+  const existing = await prisma.user.findUnique({
+    where: { login_id: loginId },
+    select: { id: true },
+  });
+
+  await prisma.user.upsert({
+    where: { login_id: loginId },
+    update: {
+      role,
+      is_active: true,
+      // パスワードは SEED_FORCE_PASSWORD_RESET=true のときだけ更新する
+      ...(FORCE_PW_RESET ? { login_pw: hash } : {}),
+    },
+    create: { login_id: loginId, login_pw: hash, role, is_active: true },
+  });
+
+  if (!existing) {
+    console.log(`${role} created  -> login_id: ${loginId}（パスワードは環境変数の値）`);
+  } else if (FORCE_PW_RESET) {
+    console.log(`${role} updated  -> login_id: ${loginId}（パスワードを再設定しました）`);
+  } else {
+    console.log(
+      `${role} exists   -> login_id: ${loginId}（パスワードは変更していません。` +
+        `変更するには SEED_FORCE_PASSWORD_RESET=true を付けて再実行）`,
+    );
+  }
+}
 
 async function main() {
   // ===== NumberSequence 初期データ (要件 6-5) =====
@@ -26,31 +78,25 @@ async function main() {
   console.log("NumberSequence seeded:", sequences.map((s) => s.seq_key).join(", "));
 
   // ===== 初期 Admin ユーザー =====
-  const adminLoginId = "admin";
-  const adminPlainPw = "Admin1234!";
-  const adminHash = await bcrypt.hash(adminPlainPw, 10);
-  await prisma.user.upsert({
-    where: { login_id: adminLoginId },
-    update: { role: "Admin", is_active: true },
-    create: { login_id: adminLoginId, login_pw: adminHash, role: "Admin", is_active: true },
-  });
-  console.log(`Admin user ready -> login_id: ${adminLoginId} / password: ${adminPlainPw}`);
+  await upsertUser(
+    process.env.SEED_ADMIN_LOGIN_ID ?? "admin",
+    requireEnv("SEED_ADMIN_PASSWORD"),
+    "Admin",
+  );
 
-  // ===== 動作確認用の一般ユーザー（role=User） =====
-  const userLoginId = "user1";
-  const userPlainPw = "User1234!";
-  const userHash = await bcrypt.hash(userPlainPw, 10);
-  await prisma.user.upsert({
-    where: { login_id: userLoginId },
-    update: { role: "User", is_active: true },
-    create: { login_id: userLoginId, login_pw: userHash, role: "User", is_active: true },
-  });
-  console.log(`User ready -> login_id: ${userLoginId} / password: ${userPlainPw}`);
+  // ===== 動作確認用の一般ユーザー（role=User）=====
+  // 本番では不要なため、SEED_USER_PASSWORD が未設定なら作成しない。
+  const userPw = process.env.SEED_USER_PASSWORD;
+  if (userPw && userPw.trim() !== "") {
+    await upsertUser(process.env.SEED_USER_LOGIN_ID ?? "user1", userPw, "User");
+  } else {
+    console.log("User skipped  -> SEED_USER_PASSWORD 未設定のため一般ユーザーは作成しません");
+  }
 }
 
 main()
   .catch((e) => {
-    console.error("Seed failed:", e);
+    console.error("Seed failed:", e instanceof Error ? e.message : e);
     process.exit(1);
   })
   .finally(async () => {

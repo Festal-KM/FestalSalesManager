@@ -1,5 +1,19 @@
 import { test, expect, type Page } from "@playwright/test";
 
+/** 資格情報はソースに置かず環境変数から取る。未設定なら理由を示して失敗させる。 */
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v || v.trim() === "") {
+    throw new Error(
+      `${name} が未設定です。E2E 実行前に設定してください（資格情報はソースに含めません）。`,
+    );
+  }
+  return v;
+}
+
+const ADMIN_ID = process.env.E2E_ADMIN_LOGIN_ID ?? "admin";
+const USER_ID = process.env.E2E_USER_LOGIN_ID ?? "user1";
+
 function currentYm(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -26,7 +40,7 @@ test("Admin通し: 取引先→メンバー→売上→upsert→編集→論理�
   const memberName = `テスト太郎${stamp}`;
   const month = currentYm();
 
-  await login(page, "admin", "Admin1234!");
+  await login(page, ADMIN_ID, requireEnv("E2E_ADMIN_PASSWORD"));
 
   // --- 取引先登録（採番される） ---
   await page.goto("/clients/new");
@@ -107,7 +121,7 @@ test("Admin通し: 取引先→メンバー→売上→upsert→編集→論理�
 });
 
 test("User権限: マスタ登録ボタン非表示・Admin専用URLは弾かれる", async ({ page }) => {
-  await login(page, "user1", "User1234!");
+  await login(page, USER_ID, requireEnv("E2E_USER_PASSWORD"));
 
   // メンバー一覧に登録ボタンが出ない
   await page.goto("/members");

@@ -3,6 +3,20 @@
 このファイルは、セッションを開き直しても実装を継続できるようにするための引き継ぎ資料です。
 **新セッションを開始したら、まずこのファイルと下部の要件全文を読んでから作業を再開してください。**
 
+> ⚠️ **Railway へ移行済み（2026-09-14）。本ドキュメントの Supabase / Vercel 前提の記述は
+> 既に無効です。** 設計・手順・実機検証結果は
+> **[`docs/RAILWAY-MIGRATION.md`](./RAILWAY-MIGRATION.md)** を参照。
+>
+> 稼働中: https://web-production-fd10e.up.railway.app （Railway / Southeast Asia）
+>
+> 特に変わった点:
+> - **`db push` ではなく `prisma migrate` 運用**。`prisma/migrations/` が正となる
+> - マイグレーションは **`package.json` の `start`（`prisma migrate deploy && next start`）
+>   で起動時に自動適用**される。`railway.json` の `preDeployCommand` は CLI デプロイでは効かない
+> - `DIRECT_URL` / pooler 6543・5432 の使い分けは**不要**
+> - DB を触る操作は `railway ssh --service web -- <コマンド>`。
+>   `railway run` はローカル実行のため内部ホスト名を解決できず**使えない**
+
 ---
 
 ## 0. 起動・実行方法
@@ -10,13 +24,13 @@
 ```bash
 cd C:\dev\performance-management-app
 npm run dev            # 開発サーバー（http://localhost:3000）
-npm run db:push        # スキーマをSupabaseへ反映（migrate devは使わない・下記参照）
+npm run db:push        # ⚠️ 非推奨。Railway 移行後は prisma migrate dev を使う
 npm run db:seed        # 初期データ（採番マスタ + Adminユーザー）
 npm run db:studio      # Prisma Studio
 npm run test:e2e       # Playwright E2E
 ```
 
-- ログイン: **login_id = `admin` / password = `Admin1234!`**（seedで作成）
+- ログイン: login_id は `SEED_ADMIN_LOGIN_ID`（既定 `admin`）、パスワードは `SEED_ADMIN_PASSWORD` で指定（seed で作成）。**資格情報はソースにもドキュメントにも置かない**
 - `.env`（git管理外）に Supabase の `DATABASE_URL` / `DIRECT_URL` と `AUTH_SECRET` 設定済み
 - このプロジェクトは **OneDrive配下ではない** `C:\dev\performance-management-app` に置いている（node_modules同期回避のため。意図的）
 
@@ -46,7 +60,8 @@ npm run test:e2e       # Playwright E2E
 ### Prisma 7（従来と大きく異なる）
 - ジェネレータは `prisma-client`（新）。出力先 **`app/generated/prisma`**（gitignore済み）。
 - import: クライアントは `@/app/generated/prisma/client` の `PrismaClient`、Enumは `@/app/generated/prisma/enums`（`Role` / `EmploymentType` / `Gender` / `SalesStatus` は const と type の両方あり）。
-- **ドライバアダプタ必須**。`new PrismaClient({ adapter })` で使う。共通インスタンスは **`lib/prisma.ts`** に実装済み（`PrismaPg` + `ssl:{rejectUnauthorized:false}`）。アプリからは常に `import { prisma } from "@/lib/prisma"`。
+- **ドライバアダプタ必須**。`new PrismaClient({ adapter })` で使う。共通インスタンスは **`lib/prisma.ts`** に実装済み（`PrismaPg`）。アプリからは常に `import { prisma } from "@/lib/prisma"`。
+  - **SSL はコードで指定しない**。接続文字列の `sslmode` で制御する（Supabase は `?sslmode=no-verify`）。→ `docs/RAILWAY-MIGRATION.md` 2-1
 - 設定は **`prisma.config.ts`**。CLI（`db push`）は `DIRECT_URL`（5432セッションプーラ）を使う設定済み。
 - **マイグレーションは `prisma db push` を使う**。`prisma migrate dev` はSupabaseがシャドウDB作成を許可せず失敗する。Phase1はdb pushでスキーマ同期。
 - スキーマ変更後は `npm run db:push` → `npm run db:generate`。
